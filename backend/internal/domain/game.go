@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Game は対戦の集約ルート（Aggregate Root, 仕様書 4.3, 9.4 games テーブル）。
+// Game は対戦の集約ルート（Aggregate Root, games テーブル）。
 //
 // # 集約の責務
 //
@@ -58,7 +58,7 @@ func (g *Game) IsCurrentTurn(userID uuid.UUID) bool {
 	return *g.CurrentTurnPlayerID == userID
 }
 
-// CanGuess は GUESS / 自動予想を受け付け可能か（仕様書 4.3）。
+// CanGuess は GUESS / 自動予想を受け付け可能か。
 //
 // 条件: status == IN_PROGRESS かつ 自分のターン。
 func (g *Game) CanGuess(userID uuid.UUID) bool {
@@ -77,7 +77,7 @@ func (g *Game) BothSecretsSet() bool {
 	return g.Player1Secret != "" && g.Player2Secret != ""
 }
 
-// SetSecretHash はプレイヤーの秘密数字ハッシュを 1 回だけ登録（仕様書 SetSecretNumberUseCase）。
+// SetSecretHash はプレイヤーの秘密数字ハッシュを 1 回だけ登録（SetSecretNumberUseCase）。
 //
 // 前提:
 //   - status == WAITING_SECRET
@@ -109,7 +109,7 @@ func (g *Game) SetSecretHash(playerID uuid.UUID, hash string) error {
 	return nil
 }
 
-// SetSecret は SetSecretHash の別名（仕様書 4.3 メソッド一覧の名称）。
+// SetSecret は SetSecretHash の別名。
 func (g *Game) SetSecret(playerID uuid.UUID, hash string) error {
 	return g.SetSecretHash(playerID, hash)
 }
@@ -154,7 +154,7 @@ func (g *Game) PlayerSlot(userID uuid.UUID) (int, error) {
 // 副作用:
 //   - status = IN_PROGRESS
 //   - current_turn = 1
-//   - current_turn_player_id = player1_id（先攻必須, 仕様書 1.6）
+//   - current_turn_player_id = player1_id（先攻必須）
 //   - started_at = now
 //
 // Redis ターン期限・WS 通知は COMMIT 後に UseCase が行う。
@@ -188,7 +188,7 @@ func (g *Game) advanceTurn(now time.Time) {
 	g.UpdatedAt = now
 }
 
-// AddGuess は予想を追加し、未勝利ならターンを進める（仕様書 4.3, P111）。
+// AddGuess は予想を追加し、未勝利ならターンを進める。
 //
 // 流れ:
 //  1. CanGuess 検証（失敗時 game_not_started / game_already_finished / not_your_turn）
@@ -220,7 +220,7 @@ func (g *Game) AddGuess(
 	return guess, nil
 }
 
-// Finish は guess_win による終了（FinishGameService, 仕様書 4.3）。
+// Finish は guess_win による終了（FinishGameService）。
 //
 //   - status = FINISHED
 //   - winner_id = winnerID
@@ -246,7 +246,7 @@ func (g *Game) Finish(winnerID uuid.UUID, now time.Time) error {
 	return nil
 }
 
-// CancelBySecretTimeout は秘密数字登録期限切れによる終了（仕様書 4.3, 4.4）。
+// CancelBySecretTimeout は秘密数字登録期限切れによる終了。
 //
 //   - status = FINISHED
 //   - winner_id = NULL（勝者なし）

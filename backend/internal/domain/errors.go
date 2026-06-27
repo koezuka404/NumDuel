@@ -2,7 +2,7 @@ package domain
 
 import "fmt"
 
-// ドメインエラーコード（仕様書 第8章）。
+// ドメインエラーコード。
 // Domain 層では HTTP ステータスを持たない。UseCase / Controller が code に応じて HTTP を決定する。
 const (
 	CodeValidation          = "validation_error"
@@ -16,7 +16,7 @@ const (
 )
 
 // DomainError は Domain 層の業務エラー。
-// Code は API レスポンス error.code と一致させる（仕様書 6.1.1）。
+// Code は API レスポンス error.code と一致させる。
 type DomainError struct {
 	Code string
 	Msg  string
@@ -78,7 +78,7 @@ func errForbidden(msg string) *DomainError {
 }
 
 // parseFourDigits は文字列から 4 桁数字（0-9, 重複なし）を検証する。
-// SecretNumber / GuessNumber の共通バリデーション（仕様書 1.1, 4.1）。
+// SecretNumber / GuessNumber の共通バリデーション。
 func parseFourDigits(input string) ([4]int, error) {
 	if len(input) != 4 {
 		return [4]int{}, errInvalidDigitLength()

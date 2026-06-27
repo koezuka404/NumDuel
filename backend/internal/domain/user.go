@@ -9,7 +9,7 @@ import (
 
 var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
-// User はユーザーアカウント Entity（仕様書 4.2, 9.3 users テーブル）。
+// User はユーザーアカウント Entity（users テーブル）。
 //
 // 永続化は Repository 経由。パスワードは bcrypt ハッシュのみ保持（平文禁止）。
 // 削除は deleted_at による論理削除。物理削除は行わない。
@@ -37,7 +37,7 @@ func (u *User) IsMaster() bool {
 	return u != nil && u.Role == RoleMaster
 }
 
-// CanMatch はマッチングキューに入れるか（仕様書 4.2）。
+// CanMatch はマッチングキューに入れるか。
 //
 // 条件: 削除済みでない AND master でない。
 // 対戦中チェック（user_in_active_game）は UseCase 側で GameRepository を参照する。
@@ -45,7 +45,7 @@ func (u *User) CanMatch() bool {
 	return u != nil && !u.IsDeleted() && !u.IsMaster()
 }
 
-// ValidateUsername は RegisterUserUseCase の入力検証（仕様書 5.2）。
+// ValidateUsername は RegisterUserUseCase の入力検証。
 func ValidateUsername(username string) error {
 	if len(username) < 3 || len(username) > 50 || !usernamePattern.MatchString(username) {
 		return errValidation("username must be 3-50 alphanumeric/underscore characters")

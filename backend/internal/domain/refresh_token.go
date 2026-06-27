@@ -6,14 +6,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// RefreshToken はリフレッシュトークンのメタデータ Entity（仕様書 Login/Refresh UseCase）。
+// RefreshToken はリフレッシュトークンのメタデータ Entity（Login/Refresh UseCase）。
 //
 // 保管方針:
 //   - 平文トークンは HttpOnly Cookie のみで運搬（Request Body 不使用）
 //   - DB には SHA-256 ハッシュ（token_hash）のみ保存
 //   - family_id … 同一ログインセッション内のローテーション単位。盗用検出時に一括失効
 //
-// テーブル: refresh_tokens（仕様書 認証章, 13.4）
+// テーブル: refresh_tokens
 type RefreshToken struct {
 	ID        uuid.UUID          // PK
 	UserID    uuid.UUID          // FK → users

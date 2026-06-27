@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// MatchHistory は勝敗履歴 Entity（読み取り専用モデル, 仕様書 4.4, 9.7）。
+// MatchHistory は勝敗履歴 Entity（読み取り専用モデル）。
 //
 // 作成条件:
 //   - guess_win でゲーム終了したときのみ FinishGameService が INSERT
@@ -45,7 +45,7 @@ func NewMatchHistory(
 	}
 }
 
-// Ranking はランキング Read Model（CQRS, 仕様書 4.5, 9.8 rankings テーブル）。
+// Ranking はランキング Read Model（CQRS, rankings テーブル）。
 //
 // 更新:
 //   - 対戦 TX からは更新しない

@@ -1,6 +1,6 @@
 package domain
 
-// GameStatus は対戦ゲームのライフサイクル状態（仕様書 4.1, 9.4）。
+// GameStatus は対戦ゲームのライフサイクル状態。
 //
 // 遷移の概要:
 //
@@ -21,10 +21,10 @@ const (
 	GameStatusFinished GameStatus = "FINISHED"
 )
 
-// Role はユーザー権限（仕様書 4.1, 9.3）。
+// Role はユーザー権限。
 //
 //   - RoleUser   … 通常ユーザー。対戦・マッチング可能
-//   - RoleMaster … 管理者。管理 API のみ。マッチング・対戦不可（仕様書 5.x, 13.13）
+//   - RoleMaster … 管理者。管理 API のみ。マッチング・対戦不可
 type Role string
 
 const (
@@ -32,7 +32,7 @@ const (
 	RoleMaster Role = "master"
 )
 
-// DigitResult は各桁の判定結果（仕様書 1.3, 4.1）。
+// DigitResult は各桁の判定結果。
 //
 // API / WS では整数 0/1 で表現し、フロントエンドが ○/× に変換する。
 //  Bulls & Cows の「数字は含むが位置が違う」は当たりにしない（位置一致のみ）。
@@ -46,7 +46,7 @@ const (
 	DigitHit DigitResult = 1
 )
 
-// RefreshTokenStatus はリフレッシュトークンの状態（仕様書 4.1, Login/Refresh UseCase）。
+// RefreshTokenStatus はリフレッシュトークンの状態。
 type RefreshTokenStatus string
 
 const (
@@ -55,4 +55,19 @@ const (
 
 	// RefreshTokenRevoked … 失効。ログアウト・ローテーション・盗用検出で設定。
 	RefreshTokenRevoked RefreshTokenStatus = "revoked"
+)
+
+// MatchingQueueStatus はマッチングキューの状態。
+type MatchingQueueStatus string
+
+const (
+	MatchingQueueWaiting MatchingQueueStatus = "waiting"
+)
+
+// LoginAction は login_logs.action の値。
+type LoginAction string
+
+const (
+	LoginActionLogin  LoginAction = "login"
+	LoginActionLogout LoginAction = "logout"
 )
