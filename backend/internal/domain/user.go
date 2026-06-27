@@ -2,6 +2,7 @@ package domain
 
 import (
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,10 +62,21 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
-// ValidatePassword は RegisterUserUseCase のパスワード検証（8 文字以上）。
+// ValidatePassword は RegisterUserUseCase / LoginUseCase のパスワード検証（8 文字以上）。
 func ValidatePassword(password string) error {
 	if len(password) < 8 {
 		return errValidation("password must be at least 8 characters")
+	}
+	return nil
+}
+
+// ValidateLoginEmail は LoginUseCase のメール検証（50 文字以下、簡易形式チェック）。
+func ValidateLoginEmail(email string) error {
+	if len(email) == 0 || len(email) > 50 {
+		return errValidation("email must be 1-50 characters")
+	}
+	if !strings.Contains(email, "@") || strings.HasPrefix(email, "@") || strings.HasSuffix(email, "@") {
+		return errValidation("email format is invalid")
 	}
 	return nil
 }

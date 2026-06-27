@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: numduel
+      POSTGRES_PASSWORD: numduel
+      POSTGRES_DB: numduel
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numduel -d numduel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-backup:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: numduel
+      POSTGRES_PASSWORD: numduel
+      POSTGRES_DB: numduel_backup
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numduel -d numduel_backup"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

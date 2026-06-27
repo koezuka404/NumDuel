@@ -46,6 +46,13 @@ type WSConnectionLog struct {
 	DisconnectedAt *time.Time
 }
 
+// RankingRebuildRow は RebuildRankingUseCase が users から集計する 1 行。
+type RankingRebuildRow struct {
+	UserID   uuid.UUID
+	Username string
+	WinCount int
+}
+
 // MatchingQueueEntry は matching_queue テーブルのレコード。
 type MatchingQueueEntry struct {
 	ID        uuid.UUID
@@ -60,8 +67,11 @@ type UserRepository interface {
 	Update(ctx context.Context, tx Transaction, user *User) error
 	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)
+	FindByEmailActive(ctx context.Context, email string) (*User, error)
 	FindByUsername(ctx context.Context, username string) (*User, error)
 	ExistsByEmailOrUsername(ctx context.Context, email, username string) (bool, error)
+	CountMasters(ctx context.Context) (int64, error)
+	ListForRankingRebuild(ctx context.Context) ([]RankingRebuildRow, error)
 	IncrementWinCount(ctx context.Context, tx Transaction, userID uuid.UUID, now time.Time) error
 	FindInactive(ctx context.Context, inactiveBefore time.Time) ([]*User, error)
 	List(ctx context.Context, page, limit int) ([]*User, int64, error)

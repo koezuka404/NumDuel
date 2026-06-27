@@ -122,6 +122,18 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*domain
 	return toUser(&m), nil
 }
 
+func (r *userRepository) FindByEmailActive(ctx context.Context, email string) (*domain.User, error) {
+	var m userModel
+	err := r.db.WithContext(ctx).First(&m, "email = ? AND deleted_at IS NULL", email).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toUser(&m), nil
+}
+
 func (r *userRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
 	var m userModel
 	err := r.db.WithContext(ctx).First(&m, "username = ?", username).Error
@@ -140,6 +152,34 @@ func (r *userRepository) ExistsByEmailOrUsername(ctx context.Context, email, use
 		Where("email = ? OR username = ?", email, username).
 		Count(&count).Error
 	return count > 0, err
+}
+
+func (r *userRepository) CountMasters(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&userModel{}).
+		Where("role = ?", domain.RoleMaster).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *userRepository) ListForRankingRebuild(ctx context.Context) ([]domain.RankingRebuildRow, error) {
+	var rows []userModel
+	err := r.db.WithContext(ctx).
+		Where("deleted_at IS NULL AND role <> ?", domain.RoleMaster).
+		Order("win_count DESC, username ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.RankingRebuildRow, len(rows))
+	for i := range rows {
+		out[i] = domain.RankingRebuildRow{
+			UserID:   rows[i].ID,
+			Username: rows[i].Username,
+			WinCount: rows[i].WinCount,
+		}
+	}
+	return out, nil
 }
 
 func (r *userRepository) IncrementWinCount(ctx context.Context, tx domain.Transaction, userID uuid.UUID, now time.Time) error {

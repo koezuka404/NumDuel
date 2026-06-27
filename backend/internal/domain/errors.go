@@ -13,6 +13,9 @@ const (
 	CodeGameAlreadyFinished = "game_already_finished" // FINISHED 後の操作
 	CodeNotYourTurn         = "not_your_turn"         // 自分のターンでない
 	CodeForbidden           = "forbidden"             // 参加者でない等
+	CodeDuplicateUser       = "duplicate_user"        // username / email 重複
+	CodeUnauthorized        = "unauthorized"          // 認証失敗
+	CodeInternalError       = "internal_error"        // DB 等の内部エラー
 )
 
 // DomainError は Domain 層の業務エラー。
@@ -75,6 +78,21 @@ func errForbidden(msg string) *DomainError {
 		msg = "forbidden"
 	}
 	return newDomainError(CodeForbidden, msg)
+}
+
+func ErrDuplicateUser() *DomainError {
+	return newDomainError(CodeDuplicateUser, "username or email already exists")
+}
+
+func ErrUnauthorized() *DomainError {
+	return newDomainError(CodeUnauthorized, "invalid credentials")
+}
+
+func ErrInternal(msg string) *DomainError {
+	if msg == "" {
+		msg = "internal server error"
+	}
+	return newDomainError(CodeInternalError, msg)
 }
 
 // parseFourDigits は文字列から 4 桁数字（0-9, 重複なし）を検証する。

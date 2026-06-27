@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -31,7 +32,27 @@ func Open(dsn string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	configurePool(gdb)
 	return &DB{gorm: gdb}, nil
+}
+
+func configurePool(gdb *gorm.DB) {
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return
+	}
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+}
+
+// Ping は DB 接続を確認する。
+func (d *DB) Ping(ctx context.Context) error {
+	sqlDB, err := d.gorm.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.PingContext(ctx)
 }
 
 func (d *DB) Gorm() *gorm.DB { return d.gorm }
@@ -54,11 +75,22 @@ func (d *DB) AutoMigrate() error {
 
 // CreateIndexes は AutoMigrate では作成できないインデックスを追加する。
 func (d *DB) CreateIndexes() error {
-	sql := `CREATE INDEX IF NOT EXISTS idx_games_active_players
+	indexes := []string{
+		`CREATE INDEX IF NOT EXISTS idx_games_active_players
 ON games (player1_id, player2_id)
-WHERE status IN ('WAITING_SECRET', 'IN_PROGRESS')`
-	if err := d.gorm.Exec(sql).Error; err != nil {
-		return fmt.Errorf("create partial index idx_games_active_players: %w", err)
+WHERE status IN ('WAITING_SECRET', 'IN_PROGRESS')`,
+		`CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_games_updated_at ON games (updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_guesses_updated_at ON guesses (updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_match_histories_updated_at ON match_histories (updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_rankings_updated_at ON rankings (updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_activity_logs_updated_at ON activity_logs (updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_login_logs_updated_at ON login_logs (updated_at)`,
+	}
+	for _, sql := range indexes {
+		if err := d.gorm.Exec(sql).Error; err != nil {
+			return fmt.Errorf("create index: %w", err)
+		}
 	}
 	return nil
 }
