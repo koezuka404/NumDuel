@@ -11,7 +11,6 @@ import (
 	"github.com/numduel/numduel/internal/domain"
 )
 
-// Repository は domain.Repository の GORM 実装。
 type Repository struct {
 	db *DB
 
@@ -29,7 +28,6 @@ type Repository struct {
 
 var _ domain.Repository = (*Repository)(nil)
 
-// NewRepository は DB 接続から Repository を生成する。
 func NewRepository(db *DB) *Repository {
 	g := db.Gorm()
 	return &Repository{

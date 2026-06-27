@@ -32,8 +32,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("database setup: %v", err)
 	}
-	_ = dbSetup.Repo
-	_ = dbSetup.Syncer
 
 	e := echo.New()
 	e.GET("/health", func(c echo.Context) error {

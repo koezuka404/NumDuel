@@ -8,14 +8,12 @@ import (
 	"github.com/numduel/numduel/internal/domain"
 )
 
-// RegisterUserInput は RegisterUserUseCase の入力。
 type RegisterUserInput struct {
 	Username string
 	Email    string
 	Password string
 }
 
-// RegisterUserOutput は RegisterUserUseCase の出力（§6.3.1）。
 type RegisterUserOutput struct {
 	ID       uuid.UUID
 	Username string
@@ -23,65 +21,43 @@ type RegisterUserOutput struct {
 	WinCount int
 }
 
-// RegisterUserUseCase は新規ユーザーを登録する。
-type RegisterUserUseCase struct {
-	AuthDeps
-}
-
-func NewRegisterUserUseCase(deps AuthDeps) *RegisterUserUseCase {
-	return &RegisterUserUseCase{AuthDeps: deps}
-}
-
-func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserInput) (*RegisterUserOutput, error) {
-	if err := domain.ValidateUsername(input.Username); err != nil {
+func RegisterUser(ctx context.Context, d AuthDeps, in RegisterUserInput) (*RegisterUserOutput, error) {
+	if err := domain.ValidateUsername(in.Username); err != nil {
 		return nil, err
 	}
-	if err := domain.ValidateEmail(input.Email); err != nil {
+	if err := domain.ValidateEmail(in.Email); err != nil {
 		return nil, err
 	}
-	if err := domain.ValidatePassword(input.Password); err != nil {
+	if err := domain.ValidatePassword(in.Password); err != nil {
 		return nil, err
 	}
-
-	exists, err := uc.Repo.Users().ExistsByEmailOrUsername(ctx, input.Email, input.Username)
+	exists, err := d.Repo.Users().ExistsByEmailOrUsername(ctx, in.Email, in.Username)
 	if err != nil {
 		return nil, domain.ErrInternal("failed to check duplicate user")
 	}
 	if exists {
 		return nil, domain.ErrDuplicateUser()
 	}
-
-	hash, err := uc.Passwords.Hash(input.Password)
+	hash, err := d.Passwords.Hash(in.Password)
 	if err != nil {
 		return nil, domain.ErrInternal("failed to hash password")
 	}
-
-	now := uc.now()
+	now := d.now()
 	user := &domain.User{
 		ID:             uuid.New(),
-		Username:       input.Username,
-		Email:          input.Email,
+		Username:       in.Username,
+		Email:          in.Email,
 		PasswordHash:   hash,
 		Role:           domain.RoleUser,
-		WinCount:       0,
 		LastActivityAt: now,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-
-	tx, err := uc.Repo.Begin(ctx)
-	if err != nil {
-		return nil, domain.ErrInternal("failed to begin transaction")
+	if err := withTx(ctx, d.Repo, func(tx domain.Transaction) error {
+		return d.Repo.Users().Create(ctx, tx, user)
+	}); err != nil {
+		return nil, err
 	}
-	defer func() { _ = uc.Repo.Rollback(tx) }()
-
-	if err := uc.Repo.Users().Create(ctx, tx, user); err != nil {
-		return nil, domain.ErrInternal("failed to create user")
-	}
-	if err := uc.Repo.Commit(tx); err != nil {
-		return nil, domain.ErrInternal("failed to commit transaction")
-	}
-
 	return &RegisterUserOutput{
 		ID:       user.ID,
 		Username: user.Username,

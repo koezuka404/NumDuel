@@ -7,14 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/numduel/numduel/internal/domain"
+	"github.com/numduel/numduel/internal/infrastructure/crypto"
 )
 
-const bcryptCost = 12
-
-// SeedMaster は users に master が 0 件のときのみ初回 master を作成する。
 func SeedMaster(ctx context.Context, repo domain.Repository, email, password string) error {
 	count, err := repo.Users().CountMasters(ctx)
 	if err != nil {
@@ -29,25 +26,15 @@ func SeedMaster(ctx context.Context, repo domain.Repository, email, password str
 	if len(password) < 8 {
 		return fmt.Errorf("NUMDUEL_MASTER_PASSWORD must be at least 8 characters")
 	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	hash, err := crypto.NewPasswordService().Hash(password)
 	if err != nil {
 		return fmt.Errorf("hash master password: %w", err)
 	}
-
 	now := time.Now().UTC()
-	user := &domain.User{
-		ID:             uuid.New(),
-		Username:       masterUsername(email),
-		Email:          email,
-		PasswordHash:   string(hash),
-		Role:           domain.RoleMaster,
-		WinCount:       0,
-		LastActivityAt: now,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}
-	return repo.Users().Create(ctx, nil, user)
+	return repo.Users().Create(ctx, nil, &domain.User{
+		ID: uuid.New(), Username: masterUsername(email), Email: email, PasswordHash: hash,
+		Role: domain.RoleMaster, LastActivityAt: now, CreatedAt: now, UpdatedAt: now,
+	})
 }
 
 func masterUsername(email string) string {

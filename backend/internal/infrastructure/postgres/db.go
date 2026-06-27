@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
@@ -132,15 +131,4 @@ func dbOrGlobal(db *gorm.DB, tx domain.Transaction) (*gorm.DB, error) {
 		return nil, fmt.Errorf("invalid transaction type")
 	}
 	return gtx.db(), nil
-}
-
-// OpenSQLite はテスト用 SQLite 接続を開く。
-func OpenSQLite(dsn string) (*DB, error) {
-	gdb, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &DB{gorm: gdb}, nil
 }

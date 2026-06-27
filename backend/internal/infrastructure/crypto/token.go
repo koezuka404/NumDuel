@@ -38,30 +38,18 @@ type accessClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (s *JWTService) Issue(userID uuid.UUID, role domain.Role, now time.Time) (string, domain.AccessTokenClaims, error) {
-	jti := uuid.New().String()
-	exp := now.Add(time.Duration(s.expiryMinutes) * time.Minute)
+func (s *JWTService) Issue(userID uuid.UUID, role domain.Role, now time.Time) (string, error) {
 	claims := accessClaims{
 		Role: string(role),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
-			ID:        jti,
+			ID:        uuid.New().String(),
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(exp),
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(s.expiryMinutes) * time.Minute)),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(s.secret)
-	if err != nil {
-		return "", domain.AccessTokenClaims{}, err
-	}
-	return signed, domain.AccessTokenClaims{
-		UserID: userID,
-		Role:   role,
-		JTI:    jti,
-		Issued: now,
-		Expiry: exp,
-	}, nil
+	return token.SignedString(s.secret)
 }
 
 type RefreshTokenService struct{}

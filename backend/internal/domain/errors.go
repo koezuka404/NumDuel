@@ -2,24 +2,20 @@ package domain
 
 import "fmt"
 
-// ドメインエラーコード。
-// Domain 層では HTTP ステータスを持たない。UseCase / Controller が code に応じて HTTP を決定する。
 const (
 	CodeValidation          = "validation_error"
-	CodeInvalidDigitLength  = "invalid_digit_length"  // 4 桁でない
-	CodeInvalidDigit        = "invalid_digit"         // 数字以外を含む
-	CodeDuplicateDigit      = "duplicate_digit"       // 同じ数字の重複
-	CodeGameNotStarted      = "game_not_started"      // WAITING_SECRET 中の GUESS 等
-	CodeGameAlreadyFinished = "game_already_finished" // FINISHED 後の操作
-	CodeNotYourTurn         = "not_your_turn"         // 自分のターンでない
-	CodeForbidden           = "forbidden"             // 参加者でない等
-	CodeDuplicateUser       = "duplicate_user"        // username / email 重複
-	CodeUnauthorized        = "unauthorized"          // 認証失敗
-	CodeInternalError       = "internal_error"        // DB 等の内部エラー
+	CodeInvalidDigitLength  = "invalid_digit_length"
+	CodeInvalidDigit        = "invalid_digit"
+	CodeDuplicateDigit      = "duplicate_digit"
+	CodeGameNotStarted      = "game_not_started"
+	CodeGameAlreadyFinished = "game_already_finished"
+	CodeNotYourTurn         = "not_your_turn"
+	CodeForbidden           = "forbidden"
+	CodeDuplicateUser       = "duplicate_user"
+	CodeUnauthorized        = "unauthorized"
+	CodeInternalError       = "internal_error"
 )
 
-// DomainError は Domain 層の業務エラー。
-// Code は API レスポンス error.code と一致させる。
 type DomainError struct {
 	Code string
 	Msg  string
@@ -32,7 +28,6 @@ func (e *DomainError) Error() string {
 	return e.Code
 }
 
-// IsDomainError は err が *DomainError か判定する。テスト・UseCase のエラー変換用。
 func IsDomainError(err error) (*DomainError, bool) {
 	if err == nil {
 		return nil, false
@@ -95,8 +90,6 @@ func ErrInternal(msg string) *DomainError {
 	return newDomainError(CodeInternalError, msg)
 }
 
-// parseFourDigits は文字列から 4 桁数字（0-9, 重複なし）を検証する。
-// SecretNumber / GuessNumber の共通バリデーション。
 func parseFourDigits(input string) ([4]int, error) {
 	if len(input) != 4 {
 		return [4]int{}, errInvalidDigitLength()
@@ -117,7 +110,6 @@ func parseFourDigits(input string) ([4]int, error) {
 	return digits, nil
 }
 
-// parseFourDigitsArray は [4]int 配列版の検証。NewSecretNumber / NewGuessNumber 用。
 func parseFourDigitsArray(digits [4]int) error {
 	seen := map[int]struct{}{}
 	for i := 0; i < 4; i++ {
