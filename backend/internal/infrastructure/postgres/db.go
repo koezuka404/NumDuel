@@ -1,3 +1,4 @@
+// PostgreSQL 接続・マイグレーション・トランザクション管理。
 package postgres
 
 import (

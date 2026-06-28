@@ -1,7 +1,9 @@
+// ドメイン層の業務エラー。HTTP ステータスへの変換は httputil が担当。
 package domain
 
 import "fmt"
 
+// API レスポンス error.code と一致させる定数群。
 const (
 	CodeValidation          = "validation_error"
 	CodeInvalidDigitLength  = "invalid_digit_length"
@@ -13,6 +15,7 @@ const (
 	CodeForbidden           = "forbidden"
 	CodeDuplicateUser       = "duplicate_user"
 	CodeUnauthorized        = "unauthorized"
+	CodeTokenExpired        = "token_expired"
 	CodeInternalError       = "internal_error"
 )
 
@@ -21,6 +24,7 @@ type DomainError struct {
 	Msg  string
 }
 
+// Error は message があればそれを、なければ code を返す。
 func (e *DomainError) Error() string {
 	if e.Msg != "" {
 		return e.Msg
@@ -79,8 +83,16 @@ func ErrDuplicateUser() *DomainError {
 	return newDomainError(CodeDuplicateUser, "username or email already exists")
 }
 
+func ErrValidation(msg string) *DomainError {
+	return errValidation(msg)
+}
+
 func ErrUnauthorized() *DomainError {
 	return newDomainError(CodeUnauthorized, "invalid credentials")
+}
+
+func ErrTokenExpired() *DomainError {
+	return newDomainError(CodeTokenExpired, "access token expired")
 }
 
 func ErrInternal(msg string) *DomainError {

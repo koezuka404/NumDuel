@@ -1,3 +1,4 @@
+// RefreshToken エンティティ。平文は Cookie のみ、DB にはハッシュを保存。
 package domain
 
 import (
@@ -6,27 +7,18 @@ import (
 	"github.com/google/uuid"
 )
 
-// RefreshToken はリフレッシュトークンのメタデータ Entity（Login/Refresh UseCase）。
-//
-// 保管方針:
-//   - 平文トークンは HttpOnly Cookie のみで運搬（Request Body 不使用）
-//   - DB には SHA-256 ハッシュ（token_hash）のみ保存
-//   - family_id … 同一ログインセッション内のローテーション単位。盗用検出時に一括失効
-//
-// テーブル: refresh_tokens
 type RefreshToken struct {
-	ID        uuid.UUID          // PK
-	UserID    uuid.UUID          // FK → users
-	TokenHash string             // SHA-256(平文) hex。UNIQUE
-	FamilyID  uuid.UUID          // ログインセッション単位の ID
-	Status    RefreshTokenStatus // active / revoked
-	ExpiresAt time.Time          // REFRESH_TOKEN_EXPIRY_DAYS 後
-	RevokedAt *time.Time         // 失効日時（revoked 時）
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	TokenHash string // SHA-256 hex
+	FamilyID  uuid.UUID // 同一ログインセッションのローテーション単位
+	Status    RefreshTokenStatus
+	ExpiresAt time.Time
+	RevokedAt *time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
-// NewRefreshToken は LoginUseCase / RefreshTokenUseCase が新規発行時に使用。
 func NewRefreshToken(
 	userID uuid.UUID,
 	tokenHash string,
@@ -46,12 +38,12 @@ func NewRefreshToken(
 	}
 }
 
-// IsActive は現在有効なトークンか（status=active かつ期限内）。
+// IsActive は status=active かつ期限内。
 func (t *RefreshToken) IsActive(now time.Time) bool {
 	return t != nil && t.Status == RefreshTokenActive && now.Before(t.ExpiresAt)
 }
 
-// Revoke はトークンを失効させる。Logout / ローテーション / family 一括失効で使用。
+// Revoke は status を revoked に更新する。
 func (t *RefreshToken) Revoke(now time.Time) {
 	t.Status = RefreshTokenRevoked
 	t.RevokedAt = &now

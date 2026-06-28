@@ -1,3 +1,4 @@
+// bcrypt によるパスワードハッシュ・照合。
 package crypto
 
 import (

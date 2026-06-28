@@ -1,3 +1,4 @@
+// 起動時の DB 初期化（接続・マイグレーション・シード・バックアップ設定）。
 package postgres
 
 import (
@@ -21,6 +22,7 @@ type SetupResult struct {
 	Syncer  *BackupSyncer
 }
 
+// Setup は primary DB を準備し、master シードと Repository を返す。
 func Setup(ctx context.Context, cfg SetupConfig) (*SetupResult, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
@@ -46,6 +48,7 @@ func Setup(ctx context.Context, cfg SetupConfig) (*SetupResult, error) {
 	return result, nil
 }
 
+// openReadyDB は接続 → Ping → AutoMigrate → インデックス作成まで行う。
 func openReadyDB(ctx context.Context, dsn string) (*DB, error) {
 	db, err := Open(dsn)
 	if err != nil {

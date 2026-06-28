@@ -1,3 +1,4 @@
+// primary → backup への差分同期。Worker から定期実行する想定。
 package postgres
 
 import (

@@ -11,6 +11,7 @@ import (
 	"github.com/numduel/numduel/internal/domain"
 )
 
+// domain.Repository の GORM 実装。テーブルごとにサブリポジトリを持つ。
 type Repository struct {
 	db *DB
 

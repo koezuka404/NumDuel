@@ -1,3 +1,4 @@
+// User エンティティと入力バリデーション。
 package domain
 
 import (
@@ -17,9 +18,9 @@ type User struct {
 	PasswordHash   string
 	Role           Role
 	WinCount       int
-	DeletedAt      *time.Time
+	DeletedAt      *time.Time // NULL = 有効
 	DeletedBy      *uuid.UUID
-	LastActivityAt time.Time
+	LastActivityAt time.Time // 無操作ログアウト判定用
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -32,6 +33,7 @@ func (u *User) IsMaster() bool {
 	return u != nil && u.Role == RoleMaster
 }
 
+// CanMatch はマッチング参加可能か（削除済み・master は不可）。
 func (u *User) CanMatch() bool {
 	return u != nil && !u.IsDeleted() && !u.IsMaster()
 }

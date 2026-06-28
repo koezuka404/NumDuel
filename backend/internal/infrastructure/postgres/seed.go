@@ -1,3 +1,4 @@
+// 初回起動時に master ユーザーが 0 件なら 1 件作成する。
 package postgres
 
 import (

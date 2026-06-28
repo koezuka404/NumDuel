@@ -1,3 +1,4 @@
+// Game 集約ルート。対戦の状態遷移とルールを Entity メソッドで保証する。
 package domain
 
 import (
@@ -6,26 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Game は対戦の集約ルート（Aggregate Root, games テーブル）。
-//
-// # 集約の責務
-//
-//   - 参加者・ターン・状態（Status）の整合性を Entity メソッドで保証
-//   - 予想（Guess）の追加は AddGuess 経由のみ
-//   - 秘密数字は HMAC ハッシュ文字列のみ保持（Player1Secret / Player2Secret）
-//   - 平文 secret は Entity に載せない（SetSecretHash で UseCase が Hash 結果を渡す）
-//
-// # 先後手
-//
-//   - Player1ID … マッチング待機で先に登録したユーザー（先攻）
-//   - Player2ID … 後から登録したユーザー（後攻）
-//   - Start 後の current_turn_player_id は必ず player1 から開始
-//
-// # 状態と操作の対応
-//
-//   - WAITING_SECRET … SetSecretHash, CancelBySecretTimeout
-//   - IN_PROGRESS    … AddGuess, Finish
-//   - FINISHED       … 読み取りのみ
 type Game struct {
 	ID                  uuid.UUID  // PK
 	Status              GameStatus // WAITING_SECRET / IN_PROGRESS / FINISHED

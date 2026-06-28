@@ -15,9 +15,10 @@ type LoginInput struct {
 
 type LoginOutput struct {
 	AccessToken  string
-	RefreshToken string
+	RefreshToken string // Controller が Cookie にセット
 }
 
+// Login は認証し、JWT と refresh_token（DB にはハッシュのみ保存）を発行する。
 func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error) {
 	if err := domain.ValidateLoginEmail(in.Email); err != nil {
 		return nil, err
@@ -41,6 +42,7 @@ func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error)
 	if err != nil {
 		return nil, domain.ErrInternal("failed to generate refresh token")
 	}
+	// family_id は新規 UUID。同一ログインセッション内のローテーションで共有
 	token := domain.NewRefreshToken(user.ID, refreshPair.Hash, uuid.New(), now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
 	if err := withTx(ctx, d.Repo, func(tx domain.Transaction) error {
 		if err := d.Repo.LoginLogs().Create(ctx, tx, &domain.LoginLog{

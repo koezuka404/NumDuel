@@ -1,3 +1,4 @@
+// Repository インターフェース群。UseCase は DB 操作をここ経由で行う。
 package domain
 
 import (
@@ -8,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Transaction は DB トランザクションのマーカー。Infrastructure 層が具体型を提供する。
+// Transaction は DB トランザクションのマーカー。
 type Transaction interface{}
 
 // TxManager はトランザクション境界を管理する。
