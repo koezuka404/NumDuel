@@ -32,5 +32,34 @@ type JWTRevoker interface {
 }
 
 type WSSessionStore interface {
+	SetUser(ctx context.Context, userID uuid.UUID, connectionID string, ttl time.Duration) error
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
+}
+
+// SecretHasher は秘密数字の位置別 HMAC 生成・照合。
+type SecretHasher interface {
+	Hash(digits [4]int, gameID uuid.UUID, playerSlot int) (string, error)
+	Verify(storedHash string, guess GuessNumber, gameID uuid.UUID, opponentSlot int) ([4]DigitResult, error)
+}
+
+// GameLockStore は Redis 連打防止ロック。
+type GameLockStore interface {
+	AcquireLock(ctx context.Context, key string, ttl time.Duration) (bool, error)
+}
+
+// TurnStore はターン期限（game:{gameId}:turn）の管理。
+type TurnStore interface {
+	SetTurn(ctx context.Context, gameID uuid.UUID, turn int, playerID uuid.UUID, startedAt, expiresAt time.Time) error
+	RemainingSeconds(ctx context.Context, gameID uuid.UUID, now time.Time) (int, error)
+	DeleteTurn(ctx context.Context, gameID uuid.UUID) error
+}
+
+// ForceLogoutStore は user:{userId}:force_logout_before の管理。
+type ForceLogoutStore interface {
+	GetForceLogoutBefore(ctx context.Context, userID uuid.UUID) (time.Time, error)
+}
+
+// EventNotifier は DB コミット後の WebSocket 通知用（現状 no-op 実装）。
+type EventNotifier interface {
+	SendToUser(ctx context.Context, userID uuid.UUID, eventType string, payload map[string]any) error
 }

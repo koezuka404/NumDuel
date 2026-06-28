@@ -11,25 +11,49 @@ import (
 	"github.com/numduel/numduel/internal/httputil"
 )
 
+type AuthConfig struct {
+	JWT         *infrcrypto.JWTService
+	Revoker     domain.JWTRevoker
+	ForceLogout domain.ForceLogoutStore
+	Repo        domain.Repository
+}
+
 // Auth は Authorization: Bearer ヘッダーを検証し、ユーザー情報をコンテキストに保存する。
-func Auth(jwt *infrcrypto.JWTService, revoker domain.JWTRevoker) echo.MiddlewareFunc {
+func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			header := c.Request().Header.Get("Authorization")
 			if !strings.HasPrefix(header, "Bearer ") {
 				return httputil.WriteError(c, domain.ErrUnauthorized())
 			}
-			token, err := jwt.Parse(strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")))
+			token, err := cfg.JWT.Parse(strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")))
 			if err != nil {
 				return httputil.WriteError(c, err)
 			}
-			// ログアウト済み JWT の再利用を防ぐ（Redis 実装後に有効）
-			if revoker != nil {
-				revoked, err := revoker.IsRevoked(c.Request().Context(), token.JTI)
+			if cfg.Revoker != nil {
+				revoked, err := cfg.Revoker.IsRevoked(c.Request().Context(), token.JTI)
 				if err != nil {
 					return httputil.WriteError(c, domain.ErrInternal("failed to check token revocation"))
 				}
 				if revoked {
+					return httputil.WriteError(c, domain.ErrUnauthorized())
+				}
+			}
+			if cfg.ForceLogout != nil && !token.IssuedAt.IsZero() {
+				before, err := cfg.ForceLogout.GetForceLogoutBefore(c.Request().Context(), token.UserID)
+				if err != nil {
+					return httputil.WriteError(c, domain.ErrInternal("failed to check force logout"))
+				}
+				if !before.IsZero() && token.IssuedAt.Before(before) {
+					return httputil.WriteError(c, domain.ErrUnauthorized())
+				}
+			}
+			if cfg.Repo != nil {
+				user, err := cfg.Repo.Users().FindByID(c.Request().Context(), token.UserID)
+				if err != nil {
+					return httputil.WriteError(c, domain.ErrInternal("failed to find user"))
+				}
+				if user == nil || user.IsDeleted() {
 					return httputil.WriteError(c, domain.ErrUnauthorized())
 				}
 			}

@@ -14,8 +14,13 @@ const (
 	CodeNotYourTurn         = "not_your_turn"
 	CodeForbidden           = "forbidden"
 	CodeDuplicateUser       = "duplicate_user"
+	CodeUserInActiveGame    = "user_in_active_game"
+	CodeAlreadyInMatching   = "already_in_matching"
 	CodeUnauthorized        = "unauthorized"
 	CodeTokenExpired        = "token_expired"
+	CodeNotFound            = "not_found"
+	CodeRateLimitExceeded   = "rate_limit_exceeded"
+	CodeGameAlreadyStarted  = "game_already_started"
 	CodeInternalError       = "internal_error"
 )
 
@@ -79,8 +84,20 @@ func errForbidden(msg string) *DomainError {
 	return newDomainError(CodeForbidden, msg)
 }
 
+func ErrForbidden(msg string) *DomainError {
+	return errForbidden(msg)
+}
+
 func ErrDuplicateUser() *DomainError {
 	return newDomainError(CodeDuplicateUser, "username or email already exists")
+}
+
+func ErrUserInActiveGame() *DomainError {
+	return newDomainError(CodeUserInActiveGame, "user is already in an active game")
+}
+
+func ErrAlreadyInMatching() *DomainError {
+	return newDomainError(CodeAlreadyInMatching, "user is already in matching queue")
 }
 
 func ErrValidation(msg string) *DomainError {
@@ -100,6 +117,25 @@ func ErrInternal(msg string) *DomainError {
 		msg = "internal server error"
 	}
 	return newDomainError(CodeInternalError, msg)
+}
+
+func ErrNotFound(msg string) *DomainError {
+	if msg == "" {
+		msg = "not found"
+	}
+	return newDomainError(CodeNotFound, msg)
+}
+
+func ErrRateLimitExceeded() *DomainError {
+	return newDomainError(CodeRateLimitExceeded, "rate limit exceeded")
+}
+
+func ErrGameAlreadyStarted() *DomainError {
+	return newDomainError(CodeGameAlreadyStarted, "game already started")
+}
+
+func ErrGameAlreadyFinished() *DomainError {
+	return errGameAlreadyFinished()
 }
 
 func parseFourDigits(input string) ([4]int, error) {

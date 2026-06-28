@@ -1,5 +1,4 @@
 // アプリケーションのエントリポイント。
-// 設定読み込み → DB 初期化 → 依存関係の組み立て → HTTP サーバー起動 の流れ。
 package main
 
 import (
@@ -17,7 +16,9 @@ import (
 	"github.com/numduel/numduel/internal/config"
 	infrcrypto "github.com/numduel/numduel/internal/infrastructure/crypto"
 	"github.com/numduel/numduel/internal/infrastructure/postgres"
-	"github.com/numduel/numduel/internal/infrastructure/redis"
+	infrredis "github.com/numduel/numduel/internal/infrastructure/redis"
+	infrws "github.com/numduel/numduel/internal/infrastructure/websocket"
+	"github.com/numduel/numduel/internal/middleware"
 	"github.com/numduel/numduel/internal/router"
 	"github.com/numduel/numduel/internal/usecase"
 )
@@ -29,7 +30,6 @@ func main() {
 	}
 
 	ctx := context.Background()
-	// 接続・マイグレーション・master シード・Repository 生成
 	dbSetup, err := postgres.Setup(ctx, postgres.SetupConfig{
 		DatabaseURL:       cfg.DatabaseURL,
 		BackupDatabaseURL: cfg.BackupDatabaseURL,
@@ -40,23 +40,55 @@ func main() {
 		log.Fatalf("database setup: %v", err)
 	}
 
+	redisStore, err := infrredis.Open(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("redis: %v", err)
+	}
+	defer func() { _ = redisStore.Close() }()
+
 	jwtService, err := infrcrypto.NewJWTService(cfg.JWTSecret, cfg.JWTExpiryMinutes)
 	if err != nil {
 		log.Fatalf("jwt: %v", err)
 	}
-	sessionStore := redis.NewStore() // 現状 no-op。Redis 実装後に差し替え
+	secretHasher, err := infrcrypto.NewSecretHashService(cfg.GameSecretPepper)
+	if err != nil {
+		log.Fatalf("secret hasher: %v", err)
+	}
+
+	hub := infrws.NewHub()
+	sessionStore := infrws.NewSessionStore(hub, redisStore)
+
 	authDeps := usecase.AuthDeps{
 		Repo:                   dbSetup.Repo,
 		Passwords:              infrcrypto.NewPasswordService(),
 		AccessTokens:           jwtService,
 		RefreshTokens:          infrcrypto.NewRefreshTokenService(),
-		JWTRevoker:             sessionStore,
+		JWTRevoker:             redisStore,
 		WSSessions:             sessionStore,
 		RefreshTokenExpiryDays: cfg.RefreshTokenExpiryDays,
 	}
+	gameDeps := usecase.GameDeps{
+		Repo: dbSetup.Repo, Secrets: secretHasher,
+		Locks: redisStore, Turns: redisStore, Notifier: hub,
+		TurnDuration: cfg.TurnDuration(), GameLockTTL: cfg.GameLockTTL(),
+	}
+	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repo, Notifier: hub}
+	wsAuthDeps := usecase.WSAuthDeps{
+		Repo: dbSetup.Repo, JWT: jwtService,
+		Revoker: redisStore, ForceLogout: redisStore, Notifier: hub,
+	}
+
+	allowed := make(map[string]struct{}, len(cfg.WSAllowedOrigins))
+	for _, o := range cfg.WSAllowedOrigins {
+		allowed[o] = struct{}{}
+	}
+	wsHandler := &infrws.Handler{
+		Hub: hub, WSAuth: wsAuthDeps, Game: gameDeps,
+		Allowed: allowed, Redis: redisStore,
+		JWTMin: cfg.JWTExpiryMinutes, Repo: dbSetup.Repo,
+	}
 
 	e := echo.New()
-	// ヘルスチェック（DB 接続確認のみ）
 	e.GET("/health", func(c echo.Context) error {
 		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
 		defer cancel()
@@ -67,7 +99,16 @@ func main() {
 		}
 		return c.JSON(http.StatusOK, map[string]any{"data": map[string]string{"status": "ok"}})
 	})
-	router.Register(e, router.Deps{Auth: authDeps, JWT: jwtService, Cfg: cfg})
+
+	router.Register(e, router.Deps{
+		Auth: authDeps, Matching: matchingDeps, Game: gameDeps,
+		WSAuth: wsAuthDeps, WS: wsHandler, JWT: jwtService,
+		AuthMW: middleware.AuthConfig{
+			JWT: jwtService, Revoker: redisStore,
+			ForceLogout: redisStore, Repo: dbSetup.Repo,
+		},
+		Cfg: cfg,
+	})
 
 	go func() {
 		addr := ":" + strconv.Itoa(cfg.Port)
@@ -77,7 +118,6 @@ func main() {
 		}
 	}()
 
-	// SIGINT/SIGTERM で graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop

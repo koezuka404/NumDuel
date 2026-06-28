@@ -34,8 +34,18 @@ func statusForCode(code string) int {
 		return http.StatusUnauthorized // 401
 	case domain.CodeTokenExpired:
 		return http.StatusNotFound // 404（クライアントは refresh を試行）
-	case domain.CodeDuplicateUser:
+	case domain.CodeDuplicateUser, domain.CodeUserInActiveGame, domain.CodeAlreadyInMatching,
+		domain.CodeGameNotStarted, domain.CodeGameAlreadyFinished, domain.CodeNotYourTurn,
+		domain.CodeGameAlreadyStarted:
 		return http.StatusConflict // 409
+	case domain.CodeForbidden:
+		return http.StatusForbidden // 403
+	case domain.CodeNotFound:
+		return http.StatusNotFound // 404
+	case domain.CodeRateLimitExceeded:
+		return http.StatusTooManyRequests // 429
+	case domain.CodeInvalidDigitLength, domain.CodeInvalidDigit, domain.CodeDuplicateDigit:
+		return http.StatusBadRequest // 400
 	default:
 		return http.StatusInternalServerError // 500
 	}
