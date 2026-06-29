@@ -11,6 +11,7 @@ import (
 	gorillaws "github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 
+	"github.com/numduel/numduel/middleware"
 	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/usecase"
 )
@@ -26,11 +27,10 @@ type Handler struct {
 }
 
 type clientMsg struct {
-	Type          string `json:"type"`
-	Token         string `json:"token"`
-	GameID        string `json:"gameId"`
-	SecretNumber  string `json:"secretNumber"`
-	GuessNumber   string `json:"guessNumber"`
+	Type         string `json:"type"`
+	GameID       string `json:"gameId"`
+	SecretNumber string `json:"secretNumber"`
+	GuessNumber  string `json:"guessNumber"`
 }
 
 func (h *Handler) Handle(c echo.Context) error {
@@ -86,7 +86,11 @@ func (h *Handler) Handle(c echo.Context) error {
 				h.writeError(conn, model.CodeUnauthorized, "authentication required")
 				continue
 			}
-			out, err := usecase.AuthenticateWebSocket(ctx, h.WSAuth, msg.Token)
+			token := ""
+			if ck, err := c.Request().Cookie(middleware.AccessCookieName); err == nil {
+				token = ck.Value
+			}
+			out, err := usecase.AuthenticateWebSocket(ctx, h.WSAuth, token)
 			if err != nil {
 				h.writeDomainError(conn, err)
 				continue

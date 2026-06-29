@@ -1,9 +1,7 @@
-// JWT 認証 Middleware。Controller の前段でトークンを検証する。
+// JWT 認証 Middleware。Cookie access_token を検証する。
 package middleware
 
 import (
-	"strings"
-
 	"github.com/labstack/echo/v4"
 
 	"github.com/numduel/numduel/model"
@@ -18,15 +16,15 @@ type AuthConfig struct {
 	Repo        model.Repository
 }
 
-// Auth は Authorization: Bearer ヘッダーを検証し、ユーザー情報をコンテキストに保存する。
+// Auth は HttpOnly Cookie access_token を検証し、ユーザー情報をコンテキストに保存する。
 func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			header := c.Request().Header.Get("Authorization")
-			if !strings.HasPrefix(header, "Bearer ") {
+			cookie, err := c.Cookie(AccessCookieName)
+			if err != nil || cookie.Value == "" {
 				return dto.WriteError(c, model.ErrUnauthorized())
 			}
-			token, err := cfg.JWT.Parse(strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")))
+			token, err := cfg.JWT.Parse(cookie.Value)
 			if err != nil {
 				return dto.WriteError(c, err)
 			}

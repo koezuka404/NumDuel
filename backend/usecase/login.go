@@ -14,8 +14,11 @@ type LoginInput struct {
 }
 
 type LoginOutput struct {
-	AccessToken  string
-	RefreshToken string // Controller が Cookie にセット
+	AccessToken  string // Controller が Cookie にセット
+	RefreshToken string
+	ID           uuid.UUID
+	Username     string
+	Role         model.Role
 }
 
 // Login は認証し、JWT と refresh_token（DB にはハッシュのみ保存）を発行する。
@@ -62,5 +65,8 @@ func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error)
 	}); err != nil {
 		return nil, err
 	}
-	return &LoginOutput{AccessToken: accessToken, RefreshToken: refreshPair.Plaintext}, nil
+	return &LoginOutput{
+		AccessToken: accessToken, RefreshToken: refreshPair.Plaintext,
+		ID: user.ID, Username: user.Username, Role: user.Role,
+	}, nil
 }

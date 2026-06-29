@@ -12,16 +12,18 @@ import (
 	"github.com/numduel/numduel/usecase"
 )
 
-const refreshCookieName = "refresh_token"
-
 type AuthController struct {
 	Auth                   usecase.AuthDeps
 	CookieSecure           bool
+	JWTExpiryMinutes       int
 	RefreshTokenExpiryDays int
 }
 
-func NewAuthController(auth usecase.AuthDeps, cookieSecure bool, refreshDays int) *AuthController {
-	return &AuthController{Auth: auth, CookieSecure: cookieSecure, RefreshTokenExpiryDays: refreshDays}
+func NewAuthController(auth usecase.AuthDeps, cookieSecure bool, jwtMinutes, refreshDays int) *AuthController {
+	return &AuthController{
+		Auth: auth, CookieSecure: cookieSecure,
+		JWTExpiryMinutes: jwtMinutes, RefreshTokenExpiryDays: refreshDays,
+	}
 }
 
 type registerRequest struct {
@@ -35,7 +37,7 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// Register POST /api/auth/register — 新規ユーザー登録（JWT は発行しない）
+// Register POST /api/auth/register
 func (h *AuthController) Register(c echo.Context) error {
 	var req registerRequest
 	if err := c.Bind(&req); err != nil {
@@ -50,7 +52,7 @@ func (h *AuthController) Register(c echo.Context) error {
 	return dto.WriteData(c, http.StatusCreated, usecase.RegisterUserResponse(out))
 }
 
-// Login POST /api/auth/login — JWT を Body、refresh を HttpOnly Cookie で返す
+// Login POST /api/auth/login — access_token / refresh_token を HttpOnly Cookie で返す
 func (h *AuthController) Login(c echo.Context) error {
 	var req loginRequest
 	if err := c.Bind(&req); err != nil {
@@ -62,13 +64,13 @@ func (h *AuthController) Login(c echo.Context) error {
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	setRefreshCookie(c, out.RefreshToken, h.RefreshTokenExpiryDays*86400, h.CookieSecure)
+	h.setAuthCookies(c, out.AccessToken, out.RefreshToken)
 	return dto.WriteData(c, http.StatusOK, usecase.LoginResponse(out))
 }
 
-// Refresh POST /api/auth/refresh — Cookie の refresh_token で accessToken を更新
+// Refresh POST /api/auth/refresh
 func (h *AuthController) Refresh(c echo.Context) error {
-	cookie, err := c.Cookie(refreshCookieName)
+	cookie, err := c.Cookie(middleware.RefreshCookieName)
 	if err != nil || cookie.Value == "" {
 		return dto.WriteError(c, model.ErrUnauthorized())
 	}
@@ -78,11 +80,11 @@ func (h *AuthController) Refresh(c echo.Context) error {
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	setRefreshCookie(c, out.RefreshToken, h.RefreshTokenExpiryDays*86400, h.CookieSecure)
-	return dto.WriteData(c, http.StatusOK, usecase.RefreshTokenResponse(out))
+	h.setAuthCookies(c, out.AccessToken, out.RefreshToken)
+	return dto.WriteData(c, http.StatusOK, map[string]any{})
 }
 
-// Logout POST /api/auth/logout — JWT 失効 + refresh 全失効 + Cookie 削除
+// Logout POST /api/auth/logout
 func (h *AuthController) Logout(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
@@ -93,20 +95,30 @@ func (h *AuthController) Logout(c echo.Context) error {
 	}); err != nil {
 		return dto.WriteError(c, err)
 	}
-	clearRefreshCookie(c, h.CookieSecure)
+	h.clearAuthCookies(c)
 	return c.NoContent(http.StatusNoContent)
 }
 
-func setRefreshCookie(c echo.Context, token string, maxAge int, secure bool) {
+func (h *AuthController) setAuthCookies(c echo.Context, accessToken, refreshToken string) {
 	c.SetCookie(&http.Cookie{
-		Name: refreshCookieName, Value: token, Path: "/api/auth/refresh",
-		HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, MaxAge: maxAge,
+		Name: middleware.AccessCookieName, Value: accessToken, Path: "/",
+		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode,
+		MaxAge: h.JWTExpiryMinutes * 60,
+	})
+	c.SetCookie(&http.Cookie{
+		Name: middleware.RefreshCookieName, Value: refreshToken, Path: "/api/auth/refresh",
+		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode,
+		MaxAge: h.RefreshTokenExpiryDays * 86400,
 	})
 }
 
-func clearRefreshCookie(c echo.Context, secure bool) {
+func (h *AuthController) clearAuthCookies(c echo.Context) {
 	c.SetCookie(&http.Cookie{
-		Name: refreshCookieName, Value: "", Path: "/api/auth/refresh",
-		HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, MaxAge: 0,
+		Name: middleware.AccessCookieName, Value: "", Path: "/",
+		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode, MaxAge: 0,
+	})
+	c.SetCookie(&http.Cookie{
+		Name: middleware.RefreshCookieName, Value: "", Path: "/api/auth/refresh",
+		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode, MaxAge: 0,
 	})
 }

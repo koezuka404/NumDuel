@@ -27,7 +27,7 @@ type Deps struct {
 }
 
 func Register(e *echo.Echo, deps Deps) {
-	auth := controller.NewAuthController(deps.Auth, deps.Cfg.CookieSecure, deps.Cfg.RefreshTokenExpiryDays)
+	auth := controller.NewAuthController(deps.Auth, deps.Cfg.CookieSecure, deps.Cfg.JWTExpiryMinutes, deps.Cfg.RefreshTokenExpiryDays)
 	me := controller.NewMeController(deps.Auth, deps.Profile)
 	match := controller.NewMatchingController(deps.Matching)
 	game := controller.NewGameController(deps.Game)

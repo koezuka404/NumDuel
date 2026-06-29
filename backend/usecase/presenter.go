@@ -8,12 +8,10 @@ func RegisterUserResponse(out *RegisterUserOutput) map[string]any {
 	}
 }
 
-func LoginResponse(out *LoginOutput) map[string]string {
-	return map[string]string{"accessToken": out.AccessToken}
-}
-
-func RefreshTokenResponse(out *RefreshTokenOutput) map[string]string {
-	return map[string]string{"accessToken": out.AccessToken}
+func LoginResponse(out *LoginOutput) map[string]any {
+	return map[string]any{
+		"id": out.ID.String(), "username": out.Username, "role": string(out.Role),
+	}
 }
 
 func GetMeResponse(out *GetMeOutput) map[string]any {
