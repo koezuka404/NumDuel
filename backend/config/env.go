@@ -23,20 +23,26 @@ type Config struct {
 	WSAllowedOrigins       []string
 }
 
+// Load は os.Getenv から設定を読み込む。
 func Load() (*Config, error) {
+	return LoadFromEnv(os.Getenv)
+}
+
+// LoadFromEnv は getenv から設定を読み込む（テスト用に注入可能）。
+func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	cfg := &Config{
-		DatabaseURL:            os.Getenv("DATABASE_URL"),
-		BackupDatabaseURL:      os.Getenv("BACKUP_DATABASE_URL"),
-		JWTSecret:              os.Getenv("JWT_SECRET"),
-		JWTExpiryMinutes:       envInt("JWT_EXPIRY_MINUTES", 60),
-		RefreshTokenExpiryDays: envInt("REFRESH_TOKEN_EXPIRY_DAYS", 7),
-		CookieSecure:           envBool("COOKIE_SECURE", false),
-		Port:                   envInt("PORT", 8080),
-		GameSecretPepper:       os.Getenv("GAME_SECRET_PEPPER"),
-		GameLockSeconds:        envInt("GAME_LOCK_SECONDS", 2),
-		TurnDurationSeconds:    envInt("TURN_DURATION_SECONDS", 30),
+		DatabaseURL:            getenv("DATABASE_URL"),
+		BackupDatabaseURL:      getenv("BACKUP_DATABASE_URL"),
+		JWTSecret:              getenv("JWT_SECRET"),
+		JWTExpiryMinutes:       envInt(getenv, "JWT_EXPIRY_MINUTES", 60),
+		RefreshTokenExpiryDays: envInt(getenv, "REFRESH_TOKEN_EXPIRY_DAYS", 7),
+		CookieSecure:           envBool(getenv, "COOKIE_SECURE", false),
+		Port:                   envInt(getenv, "PORT", 8080),
+		GameSecretPepper:       getenv("GAME_SECRET_PEPPER"),
+		GameLockSeconds:        envInt(getenv, "GAME_LOCK_SECONDS", 2),
+		TurnDurationSeconds:    envInt(getenv, "TURN_DURATION_SECONDS", 30),
 	}
-	if raw := os.Getenv("WS_ALLOWED_ORIGINS"); raw != "" {
+	if raw := getenv("WS_ALLOWED_ORIGINS"); raw != "" {
 		for _, o := range strings.Split(raw, ",") {
 			if o = strings.TrimSpace(o); o != "" {
 				cfg.WSAllowedOrigins = append(cfg.WSAllowedOrigins, o)
@@ -44,16 +50,16 @@ func Load() (*Config, error) {
 		}
 	}
 	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is required")
+		return nil, fmt.Errorf("DATABASE_URL is required (set in .env or export in shell)")
 	}
 	if cfg.JWTSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET is required")
+		return nil, fmt.Errorf("JWT_SECRET is required (set in .env or export in shell)")
 	}
 	if len(cfg.JWTSecret) < 32 {
 		return nil, fmt.Errorf("JWT_SECRET must be at least 32 characters")
 	}
 	if cfg.GameSecretPepper == "" {
-		return nil, fmt.Errorf("GAME_SECRET_PEPPER is required")
+		return nil, fmt.Errorf("GAME_SECRET_PEPPER is required (set in .env or export in shell)")
 	}
 	if len([]byte(cfg.GameSecretPepper)) < 32 {
 		return nil, fmt.Errorf("GAME_SECRET_PEPPER must be at least 32 bytes")
@@ -75,8 +81,8 @@ func (c *Config) TurnDuration() time.Duration {
 	return time.Duration(c.TurnDurationSeconds) * time.Second
 }
 
-func envInt(key string, fallback int) int {
-	raw := os.Getenv(key)
+func envInt(getenv func(string) string, key string, fallback int) int {
+	raw := getenv(key)
 	if raw == "" {
 		return fallback
 	}
@@ -87,8 +93,8 @@ func envInt(key string, fallback int) int {
 	return v
 }
 
-func envBool(key string, fallback bool) bool {
-	raw := os.Getenv(key)
+func envBool(getenv func(string) string, key string, fallback bool) bool {
+	raw := getenv(key)
 	if raw == "" {
 		return fallback
 	}

@@ -12,14 +12,16 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"gorm.io/gorm"
 
 	"github.com/numduel/numduel/config"
+	"github.com/numduel/numduel/db"
 	infrcrypto "github.com/numduel/numduel/crypto"
-	"github.com/numduel/numduel/repository"
-	infrws "github.com/numduel/numduel/websocket"
 	"github.com/numduel/numduel/middleware"
+	"github.com/numduel/numduel/repository"
 	"github.com/numduel/numduel/router"
 	"github.com/numduel/numduel/usecase"
+	infrws "github.com/numduel/numduel/websocket"
 )
 
 func main() {
@@ -28,13 +30,17 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
-	ctx := context.Background()
-	dbSetup, err := repository.Setup(ctx, repository.SetupConfig{
+	dbSetup, err := repository.Setup(context.Background(), repository.SetupConfig{
 		DatabaseURL:       cfg.DatabaseURL,
 		BackupDatabaseURL: cfg.BackupDatabaseURL,
+		Migrate:           os.Getenv("SKIP_MIGRATE") != "1",
 	})
 	if err != nil {
 		log.Fatalf("database setup: %v", err)
+	}
+	defer closeGormDB(dbSetup.Primary.Gorm())
+	if dbSetup.Backup != nil {
+		defer closeGormDB(dbSetup.Backup.Gorm())
 	}
 
 	jwtService, err := infrcrypto.NewJWTService(cfg.JWTSecret, cfg.JWTExpiryMinutes)
@@ -89,7 +95,7 @@ func main() {
 	e.GET("/health", func(c echo.Context) error {
 		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
 		defer cancel()
-		if err := dbSetup.Primary.Ping(pingCtx); err != nil {
+		if err := db.Ping(pingCtx, dbSetup.Primary.Gorm()); err != nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]any{
 				"error": map[string]string{"code": "internal_error", "message": "database unavailable"},
 			})
@@ -124,5 +130,16 @@ func main() {
 	defer cancel()
 	if err := e.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown: %v", err)
+	}
+}
+
+func closeGormDB(gdb *gorm.DB) {
+	sqlDB, err := db.SQLDB(gdb)
+	if err != nil {
+		log.Printf("database sql handle: %v", err)
+		return
+	}
+	if err := sqlDB.Close(); err != nil {
+		log.Printf("database close: %v", err)
 	}
 }

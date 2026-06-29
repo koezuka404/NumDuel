@@ -4,11 +4,14 @@ package repository
 import (
 	"context"
 	"fmt"
+
+	"github.com/numduel/numduel/db"
 )
 
 type SetupConfig struct {
 	DatabaseURL       string
 	BackupDatabaseURL string
+	Migrate           bool // false のときマイグレーションをスキップ（server 起動時は migrate 済み想定）
 }
 
 type SetupResult struct {
@@ -19,11 +22,11 @@ type SetupResult struct {
 	Syncer  *BackupSyncer
 }
 
-func Setup(ctx context.Context, cfg SetupConfig) (*SetupResult, error) {
+func Setup(_ context.Context, cfg SetupConfig) (*SetupResult, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
-	primary, err := openReadyDB(ctx, cfg.DatabaseURL)
+	primary, err := openDB(cfg.DatabaseURL, cfg.Migrate)
 	if err != nil {
 		return nil, fmt.Errorf("primary database: %w", err)
 	}
@@ -32,7 +35,7 @@ func Setup(ctx context.Context, cfg SetupConfig) (*SetupResult, error) {
 	if cfg.BackupDatabaseURL == "" {
 		return result, nil
 	}
-	backup, err := openReadyDB(ctx, cfg.BackupDatabaseURL)
+	backup, err := openDB(cfg.BackupDatabaseURL, cfg.Migrate)
 	if err != nil {
 		return nil, fmt.Errorf("backup database: %w", err)
 	}
@@ -41,19 +44,15 @@ func Setup(ctx context.Context, cfg SetupConfig) (*SetupResult, error) {
 	return result, nil
 }
 
-func openReadyDB(ctx context.Context, dsn string) (*DB, error) {
-	conn, err := Open(dsn)
+func openDB(dsn string, migrate bool) (*DB, error) {
+	gdb, err := db.Open(dsn)
 	if err != nil {
 		return nil, err
 	}
-	if err := conn.Ping(ctx); err != nil {
-		return nil, err
+	if migrate {
+		if err := db.Migrate(gdb); err != nil {
+			return nil, err
+		}
 	}
-	if err := conn.AutoMigrate(); err != nil {
-		return nil, err
-	}
-	if err := conn.CreateIndexes(); err != nil {
-		return nil, err
-	}
-	return conn, nil
+	return NewDB(gdb), nil
 }

@@ -1,28 +1,96 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: numduel-postgres
     environment:
       POSTGRES_USER: numduel
       POSTGRES_PASSWORD: numduel
       POSTGRES_DB: numduel
     ports:
       - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - numduel
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U numduel -d numduel"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
   postgres-backup:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: numduel-postgres-backup
     environment:
       POSTGRES_USER: numduel
       POSTGRES_PASSWORD: numduel
       POSTGRES_DB: numduel_backup
     ports:
       - "5433:5432"
+    volumes:
+      - pgbackup:/var/lib/postgresql/data
+    networks:
+      - numduel
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U numduel -d numduel_backup"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: numduel-migrate
+    entrypoint: ["/app/migrate"]
+    environment:
+      DATABASE_URL: postgres://numduel:numduel@postgres:5432/numduel?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - numduel
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: numduel-backend
+    environment:
+      DATABASE_URL: postgres://numduel:numduel@postgres:5432/numduel?sslmode=disable
+      BACKUP_DATABASE_URL: postgres://numduel:numduel@postgres-backup:5432/numduel_backup?sslmode=disable
+      SKIP_MIGRATE: "1"
+      JWT_SECRET: dev-docker-compose-secret-min-32-chars-long
+      GAME_SECRET_PEPPER: dev-docker-compose-pepper-min-32-bytes!!
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-backup:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - numduel
+    restart: unless-stopped
+
+networks:
+  numduel:
+    name: numduel-net
+
+volumes:
+  pgdata:
+  pgbackup:
