@@ -8,12 +8,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 // GameDeps はゲーム系 UseCase の依存関係。
 type GameDeps struct {
-	Repo         model.Repository
-	Tx           model.TxManager
+	Repo         repository.IRepository
+	Tx           repository.TxManager
 	Secrets      model.SecretHasher
 	Locks        model.GameLockStore
 	Turns        model.TurnStore
@@ -147,8 +148,8 @@ func SetSecretNumber(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, 
 		return err
 	}
 	var started bool
-	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		game, err := d.Repo.Games().FindByIDForUpdate(ctx, tx, gameID)
+	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		game, err := tx.Games().FindByIDForUpdate(ctx, gameID)
 		if err != nil {
 			return model.ErrInternal("failed to find game")
 		}
@@ -179,11 +180,11 @@ func SetSecretNumber(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, 
 			return err
 		}
 		game.UpdatedAt = d.now()
-		if err := d.Repo.Games().Update(ctx, tx, game); err != nil {
+		if err := tx.Games().Update(ctx, game); err != nil {
 			return model.ErrInternal("failed to save secret")
 		}
 		if game.BothSecretsSet() {
-			if err := startGameInTx(ctx, d, tx, game); err != nil {
+			if err := startGameInTx(ctx, tx, game, d.now()); err != nil {
 				return err
 			}
 			started = true
@@ -198,12 +199,11 @@ func SetSecretNumber(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, 
 	return nil
 }
 
-func startGameInTx(ctx context.Context, d GameDeps, tx model.Transaction, game *model.Game) error {
-	now := d.now()
+func startGameInTx(ctx context.Context, tx repository.ITxRepos, game *model.Game, now time.Time) error {
 	if err := game.Start(now); err != nil {
 		return err
 	}
-	return d.Repo.Games().Update(ctx, tx, game)
+	return tx.Games().Update(ctx, game)
 }
 
 func notifyGameStart(ctx context.Context, d GameDeps, gameID uuid.UUID) error {
@@ -283,8 +283,8 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 	var result guessResultOutput
 	var finished bool
 	var winnerID uuid.UUID
-	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		game, err := d.Repo.Games().FindByIDForUpdate(ctx, tx, gameID)
+	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		game, err := tx.Games().FindByIDForUpdate(ctx, gameID)
 		if err != nil {
 			return model.ErrInternal("failed to find game")
 		}
@@ -310,7 +310,7 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 		if err != nil {
 			return err
 		}
-		if err := d.Repo.Guesses().Create(ctx, tx, &g); err != nil {
+		if err := tx.Guesses().Create(ctx, &g); err != nil {
 			return model.ErrInternal("failed to save guess")
 		}
 		isWin := model.IsWin(results)
@@ -320,12 +320,12 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 			HitCount:     g.HitCount, IsWin: isWin, IsAuto: isAuto,
 		}
 		if isWin {
-			if err := finishGameService(ctx, d.Repo, tx, game, userID, now); err != nil {
+			if err := finishGameService(ctx, tx, game, userID, now); err != nil {
 				return err
 			}
 			finished = true
 			winnerID = userID
-		} else if err := d.Repo.Games().Update(ctx, tx, game); err != nil {
+		} else if err := tx.Games().Update(ctx, game); err != nil {
 			return model.ErrInternal("failed to update game turn")
 		}
 		if game.CurrentTurnPlayerID != nil {
@@ -338,7 +338,7 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 	return notifyGuessResult(ctx, d, gameID, result, finished, winnerID)
 }
 
-func finishGameService(ctx context.Context, repo model.Repository, tx model.Transaction, game *model.Game, winnerID uuid.UUID, now time.Time) error {
+func finishGameService(ctx context.Context, tx repository.ITxRepos, game *model.Game, winnerID uuid.UUID, now time.Time) error {
 	if winnerID == uuid.Nil {
 		return model.ErrInternal("winner is required")
 	}
@@ -346,25 +346,25 @@ func finishGameService(ctx context.Context, repo model.Repository, tx model.Tran
 	if err != nil {
 		return err
 	}
-	winner, err := repo.Users().FindByID(ctx, winnerID)
+	winner, err := tx.Users().FindByID(ctx, winnerID)
 	if err != nil || winner == nil {
 		return model.ErrInternal("failed to find winner")
 	}
-	loser, err := repo.Users().FindByID(ctx, loserID)
+	loser, err := tx.Users().FindByID(ctx, loserID)
 	if err != nil || loser == nil {
 		return model.ErrInternal("failed to find loser")
 	}
 	if err := game.Finish(winnerID, now); err != nil {
 		return err
 	}
-	if err := repo.Games().Update(ctx, tx, game); err != nil {
+	if err := tx.Games().Update(ctx, game); err != nil {
 		return model.ErrInternal("failed to finish game")
 	}
 	history := model.NewMatchHistory(game.ID, winnerID, loserID, winner.Username, loser.Username, now)
-	if err := repo.MatchHistories().Create(ctx, tx, &history); err != nil {
+	if err := tx.MatchHistories().Create(ctx, &history); err != nil {
 		return model.ErrInternal("failed to create match history")
 	}
-	if err := incrementUserWinCount(ctx, repo, tx, winnerID, now); err != nil {
+	if err := incrementUserWinCount(ctx, tx, winnerID, now); err != nil {
 		return model.ErrInternal("failed to increment win count")
 	}
 	return nil
@@ -409,7 +409,7 @@ func notifyGuessResult(ctx context.Context, d GameDeps, gameID uuid.UUID, result
 	return notifyTurnChanged(ctx, d, game)
 }
 
-func ensureGamePlayer(ctx context.Context, repo model.Repository, userID uuid.UUID) error {
+func ensureGamePlayer(ctx context.Context, repo repository.IRepository, userID uuid.UUID) error {
 	user, err := repo.Users().FindByID(ctx, userID)
 	if err != nil {
 		return model.ErrInternal("failed to find user")

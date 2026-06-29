@@ -75,3 +75,10 @@ func NewRanking(userID uuid.UUID, rank int, username string, winCount int, updat
 		UpdatedAt: updatedAt,
 	}
 }
+
+// RankingRebuildRow は RebuildRankingUseCase が users から集計する 1 行。
+type RankingRebuildRow struct {
+	UserID   uuid.UUID
+	Username string
+	WinCount int
+}

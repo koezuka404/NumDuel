@@ -7,11 +7,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 // ProfileDeps はプロフィール・履歴 UseCase の依存関係。
 type ProfileDeps struct {
-	Repo model.Repository
+	Repo repository.IRepository
 }
 
 type GetProfileOutput struct {

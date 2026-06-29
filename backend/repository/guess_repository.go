@@ -12,12 +12,8 @@ import (
 
 type guessRepository struct{ db *gorm.DB }
 
-func (r *guessRepository) Create(ctx context.Context, tx model.Transaction, guess *model.Guess) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Create(guess).Error
+func (r *guessRepository) Create(ctx context.Context, guess *model.Guess) error {
+	return r.db.WithContext(ctx).Create(guess).Error
 }
 
 func (r *guessRepository) ListByGameAndPlayer(ctx context.Context, gameID, playerID uuid.UUID) ([]model.Guess, error) {

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 type LogoutInput struct {
@@ -29,23 +30,23 @@ func Logout(ctx context.Context, d AuthDeps, in LogoutInput) error {
 	if d.WSSessions != nil {
 		_ = d.WSSessions.DeleteUser(ctx, in.UserID)
 	}
-	return withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		if err := revokeRefreshTokensByUserID(ctx, d.Repo, tx, in.UserID, now); err != nil {
+	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		if err := revokeRefreshTokensByUserID(ctx, tx, in.UserID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}
-		if err := d.Repo.LoginLogs().Create(ctx, tx, &model.LoginLog{
+		if err := tx.LoginLogs().Create(ctx, &model.LoginLog{
 			ID: uuid.New(), UserID: in.UserID, Action: model.LoginActionLogout, CreatedAt: now, UpdatedAt: now,
 		}); err != nil {
 			return model.ErrInternal("failed to create login log")
 		}
-		user, err := d.Repo.Users().FindByID(ctx, in.UserID)
+		user, err := tx.Users().FindByID(ctx, in.UserID)
 		if err != nil {
 			return model.ErrInternal("failed to find user")
 		}
 		if user != nil {
 			user.LastActivityAt = now
 			user.UpdatedAt = now
-			if err := d.Repo.Users().Update(ctx, tx, user); err != nil {
+			if err := tx.Users().Update(ctx, user); err != nil {
 				return model.ErrInternal("failed to update user activity")
 			}
 		}

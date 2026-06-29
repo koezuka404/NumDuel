@@ -17,12 +17,6 @@ type DB struct {
 	gorm *gorm.DB
 }
 
-type gormTx struct {
-	tx *gorm.DB
-}
-
-func (t gormTx) db() *gorm.DB { return t.tx }
-
 func Open(dsn string) (*DB, error) {
 	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
@@ -54,8 +48,6 @@ func (d *DB) Ping(ctx context.Context) error {
 
 func (d *DB) Gorm() *gorm.DB { return d.gorm }
 
-var _ model.TxManager = (*DB)(nil)
-
 func (d *DB) AutoMigrate() error {
 	return d.gorm.AutoMigrate(model.MigrateTargets()...)
 }
@@ -79,39 +71,4 @@ WHERE status IN ('WAITING_SECRET', 'IN_PROGRESS')`,
 		}
 	}
 	return nil
-}
-
-func (d *DB) Begin(ctx context.Context) (model.Transaction, error) {
-	tx := d.gorm.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return nil, tx.Error
-	}
-	return gormTx{tx: tx}, nil
-}
-
-func (d *DB) Commit(tx model.Transaction) error {
-	gtx, ok := tx.(gormTx)
-	if !ok {
-		return fmt.Errorf("invalid transaction type")
-	}
-	return gtx.tx.Commit().Error
-}
-
-func (d *DB) Rollback(tx model.Transaction) error {
-	gtx, ok := tx.(gormTx)
-	if !ok {
-		return fmt.Errorf("invalid transaction type")
-	}
-	return gtx.tx.Rollback().Error
-}
-
-func Conn(gdb *gorm.DB, tx model.Transaction) (*gorm.DB, error) {
-	if tx == nil {
-		return gdb, nil
-	}
-	gtx, ok := tx.(gormTx)
-	if !ok {
-		return nil, fmt.Errorf("invalid transaction type")
-	}
-	return gtx.db(), nil
 }

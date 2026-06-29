@@ -13,20 +13,12 @@ import (
 
 type userRepository struct{ db *gorm.DB }
 
-func (r *userRepository) Create(ctx context.Context, tx model.Transaction, user *model.User) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Create(user).Error
+func (r *userRepository) Create(ctx context.Context, user *model.User) error {
+	return r.db.WithContext(ctx).Create(user).Error
 }
 
-func (r *userRepository) Update(ctx context.Context, tx model.Transaction, user *model.User) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Save(user).Error
+func (r *userRepository) Update(ctx context.Context, user *model.User) error {
+	return r.db.WithContext(ctx).Save(user).Error
 }
 
 func (r *userRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.User, error) {

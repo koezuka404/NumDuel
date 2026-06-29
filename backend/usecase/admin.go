@@ -10,11 +10,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 type AdminDeps struct {
-	Repo          model.Repository
-	Tx            model.TxManager
+	Repo          repository.IRepository
+	Tx            repository.TxManager
 	WSSessions    model.WSSessionStore
 	BackupStatus  model.BackupStatusStore
 	Now           func() time.Time
@@ -84,17 +85,17 @@ func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) e
 	if d.WSSessions != nil {
 		_ = d.WSSessions.DeleteUser(ctx, targetID)
 	}
-	return withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		if err := revokeRefreshTokensByUserID(ctx, d.Repo, tx, targetID, now); err != nil {
+	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		if err := revokeRefreshTokensByUserID(ctx, tx, targetID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}
-		if err := d.Repo.MatchingQueue().DeleteByUserID(ctx, tx, targetID); err != nil {
+		if err := tx.MatchingQueue().DeleteByUserID(ctx, targetID); err != nil {
 			return model.ErrInternal("failed to remove matching queue")
 		}
 		target.DeletedAt = &now
 		target.DeletedBy = &adminID
 		target.UpdatedAt = now
-		if err := d.Repo.Users().Update(ctx, tx, target); err != nil {
+		if err := tx.Users().Update(ctx, target); err != nil {
 			return model.ErrInternal("failed to delete user")
 		}
 		return nil

@@ -13,20 +13,12 @@ import (
 
 type gameRepository struct{ db *gorm.DB }
 
-func (r *gameRepository) Create(ctx context.Context, tx model.Transaction, game *model.Game) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Create(game).Error
+func (r *gameRepository) Create(ctx context.Context, game *model.Game) error {
+	return r.db.WithContext(ctx).Create(game).Error
 }
 
-func (r *gameRepository) Update(ctx context.Context, tx model.Transaction, game *model.Game) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Save(game).Error
+func (r *gameRepository) Update(ctx context.Context, game *model.Game) error {
+	return r.db.WithContext(ctx).Save(game).Error
 }
 
 func (r *gameRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Game, error) {
@@ -41,13 +33,9 @@ func (r *gameRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Gam
 	return &m, nil
 }
 
-func (r *gameRepository) FindByIDForUpdate(ctx context.Context, tx model.Transaction, id uuid.UUID) (*model.Game, error) {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return nil, err
-	}
+func (r *gameRepository) FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Game, error) {
 	var m model.Game
-	err = forUpdate(db).First(&m, "id = ?", id).Error
+	err := forUpdate(r.db.WithContext(ctx)).First(&m, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

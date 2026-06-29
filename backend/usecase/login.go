@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 type LoginInput struct {
@@ -47,18 +48,18 @@ func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error)
 	}
 	// family_id は新規 UUID。同一ログインセッション内のローテーションで共有
 	token := model.NewRefreshToken(user.ID, refreshPair.Hash, uuid.New(), now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
-	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		if err := d.Repo.LoginLogs().Create(ctx, tx, &model.LoginLog{
+	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		if err := tx.LoginLogs().Create(ctx, &model.LoginLog{
 			ID: uuid.New(), UserID: user.ID, Action: model.LoginActionLogin, CreatedAt: now, UpdatedAt: now,
 		}); err != nil {
 			return model.ErrInternal("failed to create login log")
 		}
 		user.LastActivityAt = now
 		user.UpdatedAt = now
-		if err := d.Repo.Users().Update(ctx, tx, user); err != nil {
+		if err := tx.Users().Update(ctx, user); err != nil {
 			return model.ErrInternal("failed to update user activity")
 		}
-		if err := d.Repo.RefreshTokens().Create(ctx, tx, &token); err != nil {
+		if err := tx.RefreshTokens().Create(ctx, &token); err != nil {
 			return model.ErrInternal("failed to store refresh token")
 		}
 		return nil

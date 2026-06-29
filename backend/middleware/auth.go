@@ -5,6 +5,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 	infrcrypto "github.com/numduel/numduel/crypto"
 	"github.com/numduel/numduel/dto"
 )
@@ -13,7 +14,7 @@ type AuthConfig struct {
 	JWT         *infrcrypto.JWTService
 	Revoker     model.JWTRevoker
 	ForceLogout model.ForceLogoutStore
-	Repo        model.Repository
+	Repo        repository.IRepository
 }
 
 // Auth は HttpOnly Cookie access_token を検証し、ユーザー情報をコンテキストに保存する。

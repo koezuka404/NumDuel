@@ -12,12 +12,8 @@ import (
 
 type matchHistoryRepository struct{ db *gorm.DB }
 
-func (r *matchHistoryRepository) Create(ctx context.Context, tx model.Transaction, history *model.MatchHistory) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Create(history).Error
+func (r *matchHistoryRepository) Create(ctx context.Context, history *model.MatchHistory) error {
+	return r.db.WithContext(ctx).Create(history).Error
 }
 
 func (r *matchHistoryRepository) ListByUserID(ctx context.Context, userID uuid.UUID, page, limit int) ([]model.MatchHistory, int64, error) {

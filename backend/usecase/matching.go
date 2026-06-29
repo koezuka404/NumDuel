@@ -7,12 +7,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 // MatchingDeps はマッチング UseCase の依存関係。
 type MatchingDeps struct {
-	Repo     model.Repository
-	Tx       model.TxManager
+	Repo     repository.IRepository
+	Tx       repository.TxManager
 	Notifier model.EventNotifier
 	Now      func() time.Time
 }
@@ -38,8 +39,8 @@ type GetMatchingStatusOutput struct {
 }
 
 // MatchPlayers は待機キュー先頭 2 人をペアリングして Game を作成する（同一 TX 内）。
-func MatchPlayers(ctx context.Context, d MatchingDeps, tx model.Transaction) (*model.Game, error) {
-	entries, err := d.Repo.MatchingQueue().ListByStatusForUpdate(ctx, tx, model.MatchingQueueWaiting, 2)
+func MatchPlayers(ctx context.Context, d MatchingDeps, tx repository.ITxRepos) (*model.Game, error) {
+	entries, err := tx.MatchingQueue().ListByStatusForUpdate(ctx, model.MatchingQueueWaiting, 2)
 	if err != nil {
 		return nil, model.ErrInternal("failed to load matching queue")
 	}
@@ -53,12 +54,12 @@ func MatchPlayers(ctx context.Context, d MatchingDeps, tx model.Transaction) (*m
 	if ok, err := matchingPlayerReady(ctx, d.Repo, p1.UserID); err != nil {
 		return nil, model.ErrInternal("failed to validate matching player")
 	} else if !ok {
-		return nil, removeQueueEntries(ctx, d.Repo, tx, []uuid.UUID{p1.ID})
+		return nil, removeQueueEntries(ctx, tx, []uuid.UUID{p1.ID})
 	}
 	if ok, err := matchingPlayerReady(ctx, d.Repo, p2.UserID); err != nil {
 		return nil, model.ErrInternal("failed to validate matching player")
 	} else if !ok {
-		return nil, removeQueueEntries(ctx, d.Repo, tx, []uuid.UUID{p2.ID})
+		return nil, removeQueueEntries(ctx, tx, []uuid.UUID{p2.ID})
 	}
 	now := d.now()
 	game := &model.Game{
@@ -66,10 +67,10 @@ func MatchPlayers(ctx context.Context, d MatchingDeps, tx model.Transaction) (*m
 		Player1ID: p1.UserID, Player2ID: p2.UserID,
 		CurrentTurn: 1, CreatedAt: now, UpdatedAt: now,
 	}
-	if err := d.Repo.Games().Create(ctx, tx, game); err != nil {
+	if err := tx.Games().Create(ctx, game); err != nil {
 		return nil, model.ErrInternal("failed to create game")
 	}
-	if err := removeQueueEntries(ctx, d.Repo, tx, []uuid.UUID{p1.ID, p2.ID}); err != nil {
+	if err := removeQueueEntries(ctx, tx, []uuid.UUID{p1.ID, p2.ID}); err != nil {
 		return nil, err
 	}
 	return game, nil
@@ -103,8 +104,8 @@ func StartMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*Star
 	}
 	var matched *model.Game
 	now := d.now()
-	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		if err := d.Repo.MatchingQueue().Insert(ctx, tx, &model.MatchingQueueEntry{
+	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		if err := tx.MatchingQueue().Insert(ctx, &model.MatchingQueueEntry{
 			ID: uuid.New(), UserID: userID, Status: model.MatchingQueueWaiting, CreatedAt: now,
 		}); err != nil {
 			return model.ErrInternal("failed to join matching queue")
@@ -127,8 +128,8 @@ func StartMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*Star
 }
 
 func CancelMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*CancelMatchingOutput, error) {
-	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		return d.Repo.MatchingQueue().DeleteByUserID(ctx, tx, userID)
+	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		return tx.MatchingQueue().DeleteByUserID(ctx, userID)
 	}); err != nil {
 		return nil, err
 	}
@@ -154,7 +155,7 @@ func GetMatchingStatus(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*
 	return &GetMatchingStatusOutput{Status: "idle"}, nil
 }
 
-func matchingPlayerReady(ctx context.Context, repo model.Repository, userID uuid.UUID) (bool, error) {
+func matchingPlayerReady(ctx context.Context, repo repository.IRepository, userID uuid.UUID) (bool, error) {
 	user, err := repo.Users().FindByID(ctx, userID)
 	if err != nil {
 		return false, err
@@ -169,8 +170,8 @@ func matchingPlayerReady(ctx context.Context, repo model.Repository, userID uuid
 	return active == nil, nil
 }
 
-func removeQueueEntries(ctx context.Context, repo model.Repository, tx model.Transaction, ids []uuid.UUID) error {
-	if err := repo.MatchingQueue().DeleteByIDs(ctx, tx, ids); err != nil {
+func removeQueueEntries(ctx context.Context, tx repository.ITxRepos, ids []uuid.UUID) error {
+	if err := tx.MatchingQueue().DeleteByIDs(ctx, ids); err != nil {
 		return model.ErrInternal("failed to cleanup matching queue")
 	}
 	return nil

@@ -12,40 +12,24 @@ import (
 
 type matchingQueueRepository struct{ db *gorm.DB }
 
-func (r *matchingQueueRepository) Insert(ctx context.Context, tx model.Transaction, entry *model.MatchingQueueEntry) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Create(entry).Error
+func (r *matchingQueueRepository) Insert(ctx context.Context, entry *model.MatchingQueueEntry) error {
+	return r.db.WithContext(ctx).Create(entry).Error
 }
 
-func (r *matchingQueueRepository) DeleteByIDs(ctx context.Context, tx model.Transaction, ids []uuid.UUID) error {
+func (r *matchingQueueRepository) DeleteByIDs(ctx context.Context, ids []uuid.UUID) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Delete(&model.MatchingQueueEntry{}, "id IN ?", ids).Error
+	return r.db.WithContext(ctx).Delete(&model.MatchingQueueEntry{}, "id IN ?", ids).Error
 }
 
-func (r *matchingQueueRepository) DeleteByUserID(ctx context.Context, tx model.Transaction, userID uuid.UUID) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Delete(&model.MatchingQueueEntry{}, "user_id = ?", userID).Error
+func (r *matchingQueueRepository) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&model.MatchingQueueEntry{}, "user_id = ?", userID).Error
 }
 
-func (r *matchingQueueRepository) ListByStatusForUpdate(ctx context.Context, tx model.Transaction, status model.MatchingQueueStatus, limit int) ([]model.MatchingQueueEntry, error) {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return nil, err
-	}
+func (r *matchingQueueRepository) ListByStatusForUpdate(ctx context.Context, status model.MatchingQueueStatus, limit int) ([]model.MatchingQueueEntry, error) {
 	var rows []model.MatchingQueueEntry
-	err = forUpdate(db).
+	err := forUpdate(r.db.WithContext(ctx)).
 		Where("status = ?", status).
 		Order("created_at ASC").
 		Limit(limit).

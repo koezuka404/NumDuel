@@ -4,8 +4,6 @@ package repository
 import (
 	"context"
 	"fmt"
-
-	"github.com/numduel/numduel/model"
 )
 
 type SetupConfig struct {
@@ -16,8 +14,8 @@ type SetupConfig struct {
 type SetupResult struct {
 	Primary *DB
 	Backup  *DB
-	Repo    model.Repository
-	Tx      model.TxManager
+	Repo    IRepository
+	Tx      TxManager
 	Syncer  *BackupSyncer
 }
 
@@ -30,7 +28,7 @@ func Setup(ctx context.Context, cfg SetupConfig) (*SetupResult, error) {
 		return nil, fmt.Errorf("primary database: %w", err)
 	}
 	repo := NewRepository(primary)
-	result := &SetupResult{Primary: primary, Repo: repo, Tx: primary}
+	result := &SetupResult{Primary: primary, Repo: repo, Tx: NewTxManager(primary.Gorm())}
 	if cfg.BackupDatabaseURL == "" {
 		return result, nil
 	}

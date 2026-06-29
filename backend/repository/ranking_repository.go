@@ -11,18 +11,14 @@ import (
 
 type rankingRepository struct{ db *gorm.DB }
 
-func (r *rankingRepository) ReplaceAll(ctx context.Context, tx model.Transaction, rankings []model.Ranking) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	if err := db.Exec("DELETE FROM rankings").Error; err != nil {
+func (r *rankingRepository) ReplaceAll(ctx context.Context, rankings []model.Ranking) error {
+	if err := r.db.WithContext(ctx).Exec("DELETE FROM rankings").Error; err != nil {
 		return err
 	}
 	if len(rankings) == 0 {
 		return nil
 	}
-	return db.Create(&rankings).Error
+	return r.db.WithContext(ctx).Create(&rankings).Error
 }
 
 func (r *rankingRepository) ListAll(ctx context.Context) ([]model.Ranking, error) {

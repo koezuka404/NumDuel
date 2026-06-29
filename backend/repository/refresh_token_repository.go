@@ -10,27 +10,12 @@ import (
 	"github.com/numduel/numduel/model"
 )
 
-// IRefreshTokenRepository は RefreshToken の検索・rotation・失効・削除。
-type IRefreshTokenRepository interface {
-	FindByTokenHash(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
-	FindByTokenHashWithUser(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
-	FindByTokenHashWithUserForUpdate(ctx context.Context, tx model.Transaction, tokenHash string) (*model.RefreshToken, error)
-	MarkUsed(ctx context.Context, tx model.Transaction, id uuid.UUID, usedAt time.Time, replacedByTokenID uuid.UUID) error
-	Create(ctx context.Context, tx model.Transaction, token *model.RefreshToken) error
-	Revoke(ctx context.Context, tx model.Transaction, id uuid.UUID, revokedAt time.Time) error
-	RevokeByFamilyID(ctx context.Context, tx model.Transaction, familyID uuid.UUID, revokedAt time.Time) error
-	RevokeByUserID(ctx context.Context, tx model.Transaction, userID uuid.UUID, revokedAt time.Time) error
-	DeleteExpired(ctx context.Context, now time.Time) (int64, error)
-}
-
+// IRefreshTokenRepository は refresh_tokens テーブルへのアクセス。
 type GormRefreshTokenRepository struct {
 	baseRepo
 }
 
-var (
-	_ IRefreshTokenRepository      = (*GormRefreshTokenRepository)(nil)
-	_ model.RefreshTokenRepository = (*GormRefreshTokenRepository)(nil)
-)
+var _ IRefreshTokenRepository = (*GormRefreshTokenRepository)(nil)
 
 // NewRefreshTokenRepository は RefreshTokenRepository を作成する。
 func NewRefreshTokenRepository(db *gorm.DB) IRefreshTokenRepository {
@@ -62,13 +47,9 @@ func (r *GormRefreshTokenRepository) FindByTokenHashWithUser(ctx context.Context
 	return &token, nil
 }
 
-func (r *GormRefreshTokenRepository) FindByTokenHashWithUserForUpdate(ctx context.Context, tx model.Transaction, tokenHash string) (*model.RefreshToken, error) {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return nil, err
-	}
+func (r *GormRefreshTokenRepository) FindByTokenHashWithUserForUpdate(ctx context.Context, tokenHash string) (*model.RefreshToken, error) {
 	var token model.RefreshToken
-	if err := forUpdate(db).
+	if err := forUpdate(r.db.WithContext(ctx)).
 		Preload("User").
 		Where("token_hash = ?", tokenHash).
 		First(&token).Error; err != nil {
@@ -80,12 +61,8 @@ func (r *GormRefreshTokenRepository) FindByTokenHashWithUserForUpdate(ctx contex
 	return &token, nil
 }
 
-func (r *GormRefreshTokenRepository) MarkUsed(ctx context.Context, tx model.Transaction, id uuid.UUID, usedAt time.Time, replacedByTokenID uuid.UUID) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	res := db.Model(&model.RefreshToken{}).
+func (r *GormRefreshTokenRepository) MarkUsed(ctx context.Context, id uuid.UUID, usedAt time.Time, replacedByTokenID uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&model.RefreshToken{}).
 		Where("id = ? AND status = ? AND revoked_at IS NULL", id, model.RefreshTokenActive).
 		Updates(map[string]any{
 			"status":               model.RefreshTokenRevoked,
@@ -96,20 +73,12 @@ func (r *GormRefreshTokenRepository) MarkUsed(ctx context.Context, tx model.Tran
 	return mapRowsAffected(res.RowsAffected, res.Error)
 }
 
-func (r *GormRefreshTokenRepository) Create(ctx context.Context, tx model.Transaction, token *model.RefreshToken) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Omit("User").Create(token).Error
+func (r *GormRefreshTokenRepository) Create(ctx context.Context, token *model.RefreshToken) error {
+	return r.db.WithContext(ctx).Omit("User").Create(token).Error
 }
 
-func (r *GormRefreshTokenRepository) Revoke(ctx context.Context, tx model.Transaction, id uuid.UUID, revokedAt time.Time) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	res := db.Model(&model.RefreshToken{}).
+func (r *GormRefreshTokenRepository) Revoke(ctx context.Context, id uuid.UUID, revokedAt time.Time) error {
+	res := r.db.WithContext(ctx).Model(&model.RefreshToken{}).
 		Where("id = ? AND status = ? AND revoked_at IS NULL", id, model.RefreshTokenActive).
 		Updates(map[string]any{
 			"status":     model.RefreshTokenRevoked,
@@ -119,12 +88,8 @@ func (r *GormRefreshTokenRepository) Revoke(ctx context.Context, tx model.Transa
 	return mapRowsAffected(res.RowsAffected, res.Error)
 }
 
-func (r *GormRefreshTokenRepository) RevokeByFamilyID(ctx context.Context, tx model.Transaction, familyID uuid.UUID, revokedAt time.Time) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	res := db.Model(&model.RefreshToken{}).
+func (r *GormRefreshTokenRepository) RevokeByFamilyID(ctx context.Context, familyID uuid.UUID, revokedAt time.Time) error {
+	res := r.db.WithContext(ctx).Model(&model.RefreshToken{}).
 		Where("family_id = ? AND status = ? AND revoked_at IS NULL", familyID, model.RefreshTokenActive).
 		Updates(map[string]any{
 			"status":     model.RefreshTokenRevoked,
@@ -134,12 +99,8 @@ func (r *GormRefreshTokenRepository) RevokeByFamilyID(ctx context.Context, tx mo
 	return res.Error
 }
 
-func (r *GormRefreshTokenRepository) RevokeByUserID(ctx context.Context, tx model.Transaction, userID uuid.UUID, revokedAt time.Time) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	res := db.Model(&model.RefreshToken{}).
+func (r *GormRefreshTokenRepository) RevokeByUserID(ctx context.Context, userID uuid.UUID, revokedAt time.Time) error {
+	res := r.db.WithContext(ctx).Model(&model.RefreshToken{}).
 		Where("user_id = ? AND status = ? AND revoked_at IS NULL", userID, model.RefreshTokenActive).
 		Updates(map[string]any{
 			"status":     model.RefreshTokenRevoked,

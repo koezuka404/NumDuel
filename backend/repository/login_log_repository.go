@@ -12,12 +12,8 @@ import (
 
 type loginLogRepository struct{ db *gorm.DB }
 
-func (r *loginLogRepository) Create(ctx context.Context, tx model.Transaction, log *model.LoginLog) error {
-	db, err := conn(ctx, r.db, tx)
-	if err != nil {
-		return err
-	}
-	return db.Create(log).Error
+func (r *loginLogRepository) Create(ctx context.Context, log *model.LoginLog) error {
+	return r.db.WithContext(ctx).Create(log).Error
 }
 
 func (r *loginLogRepository) ListByUserID(ctx context.Context, userID uuid.UUID, page, limit int) ([]model.LoginLog, int64, error) {

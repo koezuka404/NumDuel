@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 type RegisterUserInput struct {
@@ -54,8 +55,8 @@ func RegisterUser(ctx context.Context, d AuthDeps, in RegisterUserInput) (*Regis
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		return d.Repo.Users().Create(ctx, tx, user)
+	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		return tx.Users().Create(ctx, user)
 	}); err != nil {
 		return nil, err
 	}

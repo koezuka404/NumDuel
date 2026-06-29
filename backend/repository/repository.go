@@ -1,10 +1,6 @@
 package repository
 
-import (
-	"github.com/numduel/numduel/model"
-)
-
-// model.Repository の GORM 実装。テーブルごとにサブリポジトリを持つ。
+// Repository は IRepository の GORM 実装。テーブルごとにサブリポジトリを持つ。
 type Repository struct {
 	users            *userRepository
 	games            *gameRepository
@@ -18,7 +14,7 @@ type Repository struct {
 	wsConnectionLogs *wsConnectionLogRepository
 }
 
-var _ model.Repository = (*Repository)(nil)
+var _ IRepository = (*Repository)(nil)
 
 func NewRepository(database *DB) *Repository {
 	g := database.Gorm()
@@ -36,15 +32,15 @@ func NewRepository(database *DB) *Repository {
 	}
 }
 
-func (r *Repository) Users() model.UserRepository                  { return r.users }
-func (r *Repository) Games() model.GameRepository                  { return r.games }
-func (r *Repository) Guesses() model.GuessRepository               { return r.guesses }
-func (r *Repository) MatchHistories() model.MatchHistoryRepository { return r.matchHistories }
-func (r *Repository) MatchingQueue() model.MatchingQueueRepository { return r.matchingQueue }
-func (r *Repository) Rankings() model.RankingRepository            { return r.rankings }
-func (r *Repository) RefreshTokens() model.RefreshTokenRepository  { return r.refreshTokens }
-func (r *Repository) ActivityLogs() model.ActivityLogRepository    { return r.activityLogs }
-func (r *Repository) LoginLogs() model.LoginLogRepository          { return r.loginLogs }
-func (r *Repository) WSConnectionLogs() model.WSConnectionLogRepository {
+func (r *Repository) Users() IUserRepository                  { return r.users }
+func (r *Repository) Games() IGameRepository                  { return r.games }
+func (r *Repository) Guesses() IGuessRepository               { return r.guesses }
+func (r *Repository) MatchHistories() IMatchHistoryRepository { return r.matchHistories }
+func (r *Repository) MatchingQueue() IMatchingQueueRepository { return r.matchingQueue }
+func (r *Repository) Rankings() IRankingRepository            { return r.rankings }
+func (r *Repository) RefreshTokens() IRefreshTokenRepository  { return r.refreshTokens }
+func (r *Repository) ActivityLogs() IActivityLogRepository    { return r.activityLogs }
+func (r *Repository) LoginLogs() ILoginLogRepository          { return r.loginLogs }
+func (r *Repository) WSConnectionLogs() IWSConnectionLogRepository {
 	return r.wsConnectionLogs
 }

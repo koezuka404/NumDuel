@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 type RankingDeps struct {
-	Repo model.Repository
-	Tx   model.TxManager
+	Repo repository.IRepository
+	Tx   repository.TxManager
 	Now  func() time.Time
 }
 
@@ -53,8 +54,8 @@ func RebuildRanking(ctx context.Context, d RankingDeps) error {
 	for i, row := range rows {
 		rankings[i] = model.NewRanking(row.UserID, i+1, row.Username, row.WinCount, now)
 	}
-	return withTx(ctx, d.Tx, func(tx model.Transaction) error {
-		if err := d.Repo.Rankings().ReplaceAll(ctx, tx, rankings); err != nil {
+	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+		if err := tx.Rankings().ReplaceAll(ctx, rankings); err != nil {
 			return model.ErrInternal("failed to replace rankings")
 		}
 		return nil

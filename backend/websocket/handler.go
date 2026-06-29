@@ -13,6 +13,7 @@ import (
 
 	"github.com/numduel/numduel/middleware"
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 	"github.com/numduel/numduel/usecase"
 )
 
@@ -23,7 +24,7 @@ type Handler struct {
 	Allowed  map[string]struct{}
 	Redis    model.WSSessionStore
 	JWTMin   int
-	Repo     model.Repository
+	Repo     repository.IRepository
 }
 
 type clientMsg struct {
@@ -179,7 +180,7 @@ func (h *Handler) touchActivity(ctx context.Context, userID uuid.UUID) {
 	now := time.Now().UTC()
 	user.LastActivityAt = now
 	user.UpdatedAt = now
-	_ = h.Repo.Users().Update(ctx, nil, user)
+	_ = h.Repo.Users().Update(ctx, user)
 }
 
 func (h *Handler) sendDomainError(userID uuid.UUID, err error) {

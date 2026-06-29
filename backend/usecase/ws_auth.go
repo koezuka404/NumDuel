@@ -8,10 +8,11 @@ import (
 
 	infrcrypto "github.com/numduel/numduel/crypto"
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/repository"
 )
 
 type WSAuthDeps struct {
-	Repo        model.Repository
+	Repo        repository.IRepository
 	JWT         *infrcrypto.JWTService
 	Revoker     model.JWTRevoker
 	ForceLogout model.ForceLogoutStore
