@@ -21,16 +21,17 @@ func RefreshToken(ctx context.Context, d AuthDeps, in RefreshTokenInput) (*Refre
 		return nil, model.ErrUnauthorized()
 	}
 	now := d.now()
-	stored, err := d.Repo.RefreshTokens().FindByTokenHash(ctx, d.RefreshTokens.Hash(in.RefreshToken))
+	hash := d.RefreshTokens.Hash(in.RefreshToken)
+
+	stored, err := d.Repo.RefreshTokens().FindByTokenHash(ctx, hash)
 	if err != nil {
 		return nil, model.ErrInternal("failed to find refresh token")
 	}
 	if stored == nil {
 		return nil, model.ErrUnauthorized()
 	}
-	// 失効済みトークンの再使用 = 盗用疑い → family 一括失効
 	if stored.Status == model.RefreshTokenRevoked {
-		if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
+		if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
 			return revokeRefreshTokenFamily(ctx, d.Repo, tx, stored.FamilyID, now)
 		}); err != nil {
 			return nil, err
@@ -41,47 +42,54 @@ func RefreshToken(ctx context.Context, d AuthDeps, in RefreshTokenInput) (*Refre
 		return nil, model.ErrUnauthorized()
 	}
 	if !stored.IsActive(now) {
-		stored.Revoke(now)
-		if err := d.Repo.RefreshTokens().Update(ctx, nil, stored); err != nil {
+		if err := d.Repo.RefreshTokens().Revoke(ctx, nil, stored.ID, now); err != nil {
 			return nil, model.ErrInternal("failed to revoke expired refresh token")
 		}
 		return nil, model.ErrUnauthorized()
 	}
-	user, err := d.Repo.Users().FindByID(ctx, stored.UserID)
-	if err != nil {
-		return nil, model.ErrInternal("failed to find user")
-	}
-	if user == nil || user.IsDeleted() {
-		stored.Revoke(now)
-		_ = d.Repo.RefreshTokens().Update(ctx, nil, stored)
-		return nil, model.ErrUnauthorized()
-	}
-	accessToken, err := d.AccessTokens.Issue(user.ID, user.Role, now)
-	if err != nil {
-		return nil, model.ErrInternal("failed to issue access token")
-	}
-	refreshPair, err := d.RefreshTokens.Generate()
-	if err != nil {
-		return nil, model.ErrInternal("failed to generate refresh token")
-	}
-	newToken := model.NewRefreshToken(user.ID, refreshPair.Hash, stored.FamilyID, now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
-	// 旧 refresh を失効 → 新 refresh を INSERT（ローテーション）
-	if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
-		stored.Revoke(now)
-		if err := d.Repo.RefreshTokens().Update(ctx, tx, stored); err != nil {
-			return model.ErrInternal("failed to revoke old refresh token")
+
+	var accessToken, refreshPlain string
+	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
+		locked, err := d.Repo.RefreshTokens().FindByTokenHashWithUserForUpdate(ctx, tx, hash)
+		if err != nil {
+			return model.ErrInternal("failed to lock refresh token")
 		}
+		if locked == nil || !locked.IsActive(now) {
+			return model.ErrUnauthorized()
+		}
+		user, err := d.Repo.Users().FindByID(ctx, locked.UserID)
+		if err != nil {
+			return model.ErrInternal("failed to find user")
+		}
+		if user == nil || user.IsDeleted() {
+			_ = d.Repo.RefreshTokens().Revoke(ctx, tx, locked.ID, now)
+			return model.ErrUnauthorized()
+		}
+
+		accessToken, err = d.AccessTokens.Issue(user.ID, user.Role, now)
+		if err != nil {
+			return model.ErrInternal("failed to issue access token")
+		}
+		refreshPair, err := d.RefreshTokens.Generate()
+		if err != nil {
+			return model.ErrInternal("failed to generate refresh token")
+		}
+		newToken := model.NewRefreshToken(user.ID, refreshPair.Hash, locked.FamilyID, now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
 		if err := d.Repo.RefreshTokens().Create(ctx, tx, &newToken); err != nil {
 			return model.ErrInternal("failed to store refresh token")
+		}
+		if err := d.Repo.RefreshTokens().MarkUsed(ctx, tx, locked.ID, now, newToken.ID); err != nil {
+			return model.ErrInternal("failed to rotate refresh token")
 		}
 		user.LastActivityAt = now
 		user.UpdatedAt = now
 		if err := d.Repo.Users().Update(ctx, tx, user); err != nil {
 			return model.ErrInternal("failed to update user activity")
 		}
+		refreshPlain = refreshPair.Plaintext
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	return &RefreshTokenOutput{AccessToken: accessToken, RefreshToken: refreshPair.Plaintext}, nil
+	return &RefreshTokenOutput{AccessToken: accessToken, RefreshToken: refreshPlain}, nil
 }

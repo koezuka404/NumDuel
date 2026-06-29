@@ -51,6 +51,7 @@ func main() {
 
 	authDeps := usecase.AuthDeps{
 		Repo:                   dbSetup.Repo,
+		Tx:                     dbSetup.Tx,
 		Passwords:              infrcrypto.NewPasswordService(),
 		AccessTokens:           jwtService,
 		RefreshTokens:          infrcrypto.NewRefreshTokenService(),
@@ -59,15 +60,15 @@ func main() {
 		RefreshTokenExpiryDays: cfg.RefreshTokenExpiryDays,
 	}
 	gameDeps := usecase.GameDeps{
-		Repo: dbSetup.Repo, Secrets: secretHasher,
+		Repo: dbSetup.Repo, Tx: dbSetup.Tx, Secrets: secretHasher,
 		Locks: nil, Turns: nil, Notifier: hub,
 		TurnDuration: cfg.TurnDuration(), GameLockTTL: cfg.GameLockTTL(),
 	}
-	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repo, Notifier: hub}
+	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx, Notifier: hub}
 	profileDeps := usecase.ProfileDeps{Repo: dbSetup.Repo}
-	rankingDeps := usecase.RankingDeps{Repo: dbSetup.Repo}
+	rankingDeps := usecase.RankingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx}
 	adminDeps := usecase.AdminDeps{
-		Repo: dbSetup.Repo, WSSessions: sessionStore, BackupStatus: nil,
+		Repo: dbSetup.Repo, Tx: dbSetup.Tx, WSSessions: sessionStore, BackupStatus: nil,
 	}
 	wsAuthDeps := usecase.WSAuthDeps{
 		Repo: dbSetup.Repo, JWT: jwtService,

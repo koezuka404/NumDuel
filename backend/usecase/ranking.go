@@ -9,6 +9,7 @@ import (
 
 type RankingDeps struct {
 	Repo model.Repository
+	Tx   model.TxManager
 	Now  func() time.Time
 }
 
@@ -52,7 +53,7 @@ func RebuildRanking(ctx context.Context, d RankingDeps) error {
 	for i, row := range rows {
 		rankings[i] = model.NewRanking(row.UserID, i+1, row.Username, row.WinCount, now)
 	}
-	return withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	return withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		if err := d.Repo.Rankings().ReplaceAll(ctx, tx, rankings); err != nil {
 			return model.ErrInternal("failed to replace rankings")
 		}

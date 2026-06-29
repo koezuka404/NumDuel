@@ -47,7 +47,7 @@ func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error)
 	}
 	// family_id は新規 UUID。同一ログインセッション内のローテーションで共有
 	token := model.NewRefreshToken(user.ID, refreshPair.Hash, uuid.New(), now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
-	if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		if err := d.Repo.LoginLogs().Create(ctx, tx, &model.LoginLog{
 			ID: uuid.New(), UserID: user.ID, Action: model.LoginActionLogin, CreatedAt: now, UpdatedAt: now,
 		}); err != nil {

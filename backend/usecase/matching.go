@@ -12,6 +12,7 @@ import (
 // MatchingDeps はマッチング UseCase の依存関係。
 type MatchingDeps struct {
 	Repo     model.Repository
+	Tx       model.TxManager
 	Notifier model.EventNotifier
 	Now      func() time.Time
 }
@@ -102,7 +103,7 @@ func StartMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*Star
 	}
 	var matched *model.Game
 	now := d.now()
-	if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		if err := d.Repo.MatchingQueue().Insert(ctx, tx, &model.MatchingQueueEntry{
 			ID: uuid.New(), UserID: userID, Status: model.MatchingQueueWaiting, CreatedAt: now,
 		}); err != nil {
@@ -126,7 +127,7 @@ func StartMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*Star
 }
 
 func CancelMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*CancelMatchingOutput, error) {
-	if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		return d.Repo.MatchingQueue().DeleteByUserID(ctx, tx, userID)
 	}); err != nil {
 		return nil, err

@@ -13,6 +13,7 @@ import (
 // GameDeps はゲーム系 UseCase の依存関係。
 type GameDeps struct {
 	Repo         model.Repository
+	Tx           model.TxManager
 	Secrets      model.SecretHasher
 	Locks        model.GameLockStore
 	Turns        model.TurnStore
@@ -118,7 +119,7 @@ func buildGameState(ctx context.Context, d GameDeps, userID, gameID uuid.UUID) (
 		summaries[i] = GuessSummary{
 			Turn: g.Turn, GuessNumber: g.GuessNumber,
 			DigitResults: model.DigitResultsToInts(g.DigitResults),
-			HitCount: g.HitCount, IsAuto: g.IsAuto,
+			HitCount:     g.HitCount, IsAuto: g.IsAuto,
 		}
 	}
 	return &GameStateOutput{
@@ -146,7 +147,7 @@ func SetSecretNumber(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, 
 		return err
 	}
 	var started bool
-	if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		game, err := d.Repo.Games().FindByIDForUpdate(ctx, tx, gameID)
 		if err != nil {
 			return model.ErrInternal("failed to find game")
@@ -158,11 +159,11 @@ func SetSecretNumber(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, 
 			return model.ErrForbidden("not a participant")
 		}
 		switch game.Status {
-		case model.GameStatusWaitingSecret:
 		case model.GameStatusInProgress:
 			return model.ErrGameAlreadyStarted()
 		case model.GameStatusFinished:
 			return model.ErrGameAlreadyFinished()
+		case model.GameStatusWaitingSecret:
 		default:
 			return model.ErrValidation("invalid game status")
 		}
@@ -244,7 +245,7 @@ func notifyTurnChanged(ctx context.Context, d GameDeps, game *model.Game) error 
 	payload := map[string]any{
 		"gameId": game.ID.String(), "currentTurn": game.CurrentTurn,
 		"currentTurnPlayerID": game.CurrentTurnPlayerID.String(),
-		"remainingSeconds": remaining,
+		"remainingSeconds":    remaining,
 	}
 	for _, uid := range []uuid.UUID{game.Player1ID, game.Player2ID} {
 		_ = d.Notifier.SendToUser(ctx, uid, "TURN_CHANGED", payload)
@@ -282,7 +283,7 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 	var result guessResultOutput
 	var finished bool
 	var winnerID uuid.UUID
-	if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		game, err := d.Repo.Games().FindByIDForUpdate(ctx, tx, gameID)
 		if err != nil {
 			return model.ErrInternal("failed to find game")
@@ -316,7 +317,7 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 		result = guessResultOutput{
 			GuessID: g.ID, PlayerID: userID,
 			DigitResults: model.DigitResultsToInts(g.DigitResults),
-			HitCount: g.HitCount, IsWin: isWin, IsAuto: isAuto,
+			HitCount:     g.HitCount, IsWin: isWin, IsAuto: isAuto,
 		}
 		if isWin {
 			if err := finishGameService(ctx, d.Repo, tx, game, userID, now); err != nil {

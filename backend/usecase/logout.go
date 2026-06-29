@@ -29,7 +29,7 @@ func Logout(ctx context.Context, d AuthDeps, in LogoutInput) error {
 	if d.WSSessions != nil {
 		_ = d.WSSessions.DeleteUser(ctx, in.UserID)
 	}
-	return withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	return withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		if err := revokeRefreshTokensByUserID(ctx, d.Repo, tx, in.UserID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}

@@ -1,22 +1,18 @@
 package repository
 
 import (
-	"context"
-
 	"github.com/numduel/numduel/model"
 )
 
 // model.Repository の GORM 実装。テーブルごとにサブリポジトリを持つ。
 type Repository struct {
-	database *DB
-
 	users            *userRepository
 	games            *gameRepository
 	guesses          *guessRepository
 	matchHistories   *matchHistoryRepository
 	matchingQueue    *matchingQueueRepository
 	rankings         *rankingRepository
-	refreshTokens    *refreshTokenRepository
+	refreshTokens    IRefreshTokenRepository
 	activityLogs     *activityLogRepository
 	loginLogs        *loginLogRepository
 	wsConnectionLogs *wsConnectionLogRepository
@@ -27,30 +23,17 @@ var _ model.Repository = (*Repository)(nil)
 func NewRepository(database *DB) *Repository {
 	g := database.Gorm()
 	return &Repository{
-		database:         database,
 		users:            &userRepository{db: g},
 		games:            &gameRepository{db: g},
 		guesses:          &guessRepository{db: g},
 		matchHistories:   &matchHistoryRepository{db: g},
 		matchingQueue:    &matchingQueueRepository{db: g},
 		rankings:         &rankingRepository{db: g},
-		refreshTokens:    &refreshTokenRepository{db: g},
+		refreshTokens:    NewRefreshTokenRepository(g),
 		activityLogs:     &activityLogRepository{db: g},
 		loginLogs:        &loginLogRepository{db: g},
 		wsConnectionLogs: &wsConnectionLogRepository{db: g},
 	}
-}
-
-func (r *Repository) Begin(ctx context.Context) (model.Transaction, error) {
-	return r.database.Begin(ctx)
-}
-
-func (r *Repository) Commit(tx model.Transaction) error {
-	return r.database.Commit(tx)
-}
-
-func (r *Repository) Rollback(tx model.Transaction) error {
-	return r.database.Rollback(tx)
 }
 
 func (r *Repository) Users() model.UserRepository                  { return r.users }

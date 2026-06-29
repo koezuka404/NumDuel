@@ -54,6 +54,8 @@ func (d *DB) Ping(ctx context.Context) error {
 
 func (d *DB) Gorm() *gorm.DB { return d.gorm }
 
+var _ model.TxManager = (*DB)(nil)
+
 func (d *DB) AutoMigrate() error {
 	return d.gorm.AutoMigrate(model.MigrateTargets()...)
 }

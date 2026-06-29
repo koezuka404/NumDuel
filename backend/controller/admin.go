@@ -57,7 +57,7 @@ func (h *AdminController) DeleteUser(c echo.Context) error {
 
 // RebuildRanking POST /api/admin/ranking/rebuild
 func (h *AdminController) RebuildRanking(c echo.Context) error {
-	if err := usecase.RebuildRanking(c.Request().Context(), usecase.RankingDeps{Repo: h.Deps.Repo, Now: h.Deps.Now}); err != nil {
+	if err := usecase.RebuildRanking(c.Request().Context(), usecase.RankingDeps{Repo: h.Deps.Repo, Tx: h.Deps.Tx, Now: h.Deps.Now}); err != nil {
 		return dto.WriteError(c, err)
 	}
 	return c.NoContent(http.StatusNoContent)

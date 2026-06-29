@@ -128,11 +128,14 @@ type RankingRepository interface {
 
 // RefreshTokenRepository は refresh_tokens テーブルへのアクセス。
 type RefreshTokenRepository interface {
-	Create(ctx context.Context, tx Transaction, token *RefreshToken) error
-	Update(ctx context.Context, tx Transaction, token *RefreshToken) error
 	FindByTokenHash(ctx context.Context, tokenHash string) (*RefreshToken, error)
-	UpdateStatusByUserID(ctx context.Context, tx Transaction, userID uuid.UUID, fromStatus, toStatus RefreshTokenStatus, revokedAt *time.Time, now time.Time) error
-	UpdateStatusByFamilyID(ctx context.Context, tx Transaction, familyID uuid.UUID, fromStatus, toStatus RefreshTokenStatus, revokedAt *time.Time, now time.Time) error
+	FindByTokenHashWithUser(ctx context.Context, tokenHash string) (*RefreshToken, error)
+	FindByTokenHashWithUserForUpdate(ctx context.Context, tx Transaction, tokenHash string) (*RefreshToken, error)
+	MarkUsed(ctx context.Context, tx Transaction, id uuid.UUID, usedAt time.Time, replacedByTokenID uuid.UUID) error
+	Create(ctx context.Context, tx Transaction, token *RefreshToken) error
+	Revoke(ctx context.Context, tx Transaction, id uuid.UUID, revokedAt time.Time) error
+	RevokeByFamilyID(ctx context.Context, tx Transaction, familyID uuid.UUID, revokedAt time.Time) error
+	RevokeByUserID(ctx context.Context, tx Transaction, userID uuid.UUID, revokedAt time.Time) error
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
@@ -160,9 +163,8 @@ type WSConnectionLogRepository interface {
 	DeleteOlderThan(ctx context.Context, before time.Time, batchSize int) (int64, error)
 }
 
-// Repository は TxManager と各テーブル用 Repository へのアクセサを提供する。
+// Repository は各テーブル用 Repository へのアクセサを提供する。
 type Repository interface {
-	TxManager
 	Users() UserRepository
 	Games() GameRepository
 	Guesses() GuessRepository

@@ -54,7 +54,7 @@ func RegisterUser(ctx context.Context, d AuthDeps, in RegisterUserInput) (*Regis
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	if err := withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		return d.Repo.Users().Create(ctx, tx, user)
 	}); err != nil {
 		return nil, err

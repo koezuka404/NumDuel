@@ -14,6 +14,7 @@ import (
 
 type AdminDeps struct {
 	Repo          model.Repository
+	Tx            model.TxManager
 	WSSessions    model.WSSessionStore
 	BackupStatus  model.BackupStatusStore
 	Now           func() time.Time
@@ -83,7 +84,7 @@ func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) e
 	if d.WSSessions != nil {
 		_ = d.WSSessions.DeleteUser(ctx, targetID)
 	}
-	return withTx(ctx, d.Repo, func(tx model.Transaction) error {
+	return withTx(ctx, d.Tx, func(tx model.Transaction) error {
 		if err := revokeRefreshTokensByUserID(ctx, d.Repo, tx, targetID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}

@@ -69,15 +69,11 @@ func incrementUserWinCount(ctx context.Context, repo model.Repository, tx model.
 }
 
 func revokeRefreshTokensByUserID(ctx context.Context, repo model.Repository, tx model.Transaction, userID uuid.UUID, now time.Time) error {
-	return repo.RefreshTokens().UpdateStatusByUserID(
-		ctx, tx, userID, model.RefreshTokenActive, model.RefreshTokenRevoked, &now, now,
-	)
+	return repo.RefreshTokens().RevokeByUserID(ctx, tx, userID, now)
 }
 
 func revokeRefreshTokenFamily(ctx context.Context, repo model.Repository, tx model.Transaction, familyID uuid.UUID, now time.Time) error {
-	return repo.RefreshTokens().UpdateStatusByFamilyID(
-		ctx, tx, familyID, model.RefreshTokenActive, model.RefreshTokenRevoked, &now, now,
-	)
+	return repo.RefreshTokens().RevokeByFamilyID(ctx, tx, familyID, now)
 }
 
 func userWaitingInMatchingQueue(ctx context.Context, repo model.Repository, userID uuid.UUID) (bool, error) {

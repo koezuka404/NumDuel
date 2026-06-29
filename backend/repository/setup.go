@@ -17,6 +17,7 @@ type SetupResult struct {
 	Primary *DB
 	Backup  *DB
 	Repo    model.Repository
+	Tx      model.TxManager
 	Syncer  *BackupSyncer
 }
 
@@ -29,7 +30,7 @@ func Setup(ctx context.Context, cfg SetupConfig) (*SetupResult, error) {
 		return nil, fmt.Errorf("primary database: %w", err)
 	}
 	repo := NewRepository(primary)
-	result := &SetupResult{Primary: primary, Repo: repo}
+	result := &SetupResult{Primary: primary, Repo: repo, Tx: primary}
 	if cfg.BackupDatabaseURL == "" {
 		return result, nil
 	}
