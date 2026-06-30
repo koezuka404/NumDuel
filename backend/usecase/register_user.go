@@ -22,7 +22,7 @@ type RegisterUserOutput struct {
 	WinCount int
 }
 
-// RegisterUser は新規ユーザーを登録する。JWT / refresh / login_logs は作成しない。
+// RegisterUser は新規ユーザーを登録するJWT / refresh / login_logs は作成しない
 func RegisterUser(ctx context.Context, d AuthDeps, in RegisterUserInput) (*RegisterUserOutput, error) {
 	if err := model.ValidateUsername(in.Username); err != nil {
 		return nil, err

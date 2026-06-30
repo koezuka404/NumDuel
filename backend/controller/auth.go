@@ -1,4 +1,4 @@
-// 認証 API の HTTP ハンドラ。JSON ↔ UseCase の変換と Cookie 操作を担当。
+// 認証 API の HTTP ハンドラJSON ↔ UseCase の変換と Cookie 操作を担当
 package controller
 
 import (

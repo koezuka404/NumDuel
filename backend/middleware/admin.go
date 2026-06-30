@@ -7,7 +7,7 @@ import (
 	"github.com/numduel/numduel/dto"
 )
 
-// Admin は role=master の JWT のみ通す（仕様 11.6）。
+// Admin は role=master の JWT のみ通す
 func Admin() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

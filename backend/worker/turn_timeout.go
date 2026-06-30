@@ -10,7 +10,7 @@ import (
 	"github.com/numduel/numduel/usecase"
 )
 
-// TurnTimeoutWorker は Redis の期限切れターンをポーリングし HandleTimeout を実行する。
+// TurnTimeoutWorker は Redis の期限切れターンをポーリングし HandleTimeout を実行する
 type TurnTimeoutWorker struct {
 	Store    *infrredis.Store
 	Game     usecase.GameDeps

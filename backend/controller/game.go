@@ -1,4 +1,4 @@
-// ゲーム API の HTTP ハンドラ。
+// ゲーム API の HTTP ハンドラ
 package controller
 
 import (

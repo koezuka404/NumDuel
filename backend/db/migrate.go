@@ -14,7 +14,7 @@ func execSQL(gdb *gorm.DB, q string) error {
 
 var execSQLFn = execSQL
 
-// Migrate はスキーマの AutoMigrate と追加インデックスを適用する。
+// Migrate はスキーマの AutoMigrate と追加インデックスを適用する
 func Migrate(gdb *gorm.DB) error {
 	if err := gdb.AutoMigrate(model.MigrateTargets()...); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)

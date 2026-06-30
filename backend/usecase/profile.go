@@ -10,7 +10,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// ProfileDeps はプロフィール・履歴 UseCase の依存関係。
+// ProfileDeps はプロフィール・履歴 UseCase の依存関係
 type ProfileDeps struct {
 	Repo repository.IRepository
 }

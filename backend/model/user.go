@@ -1,4 +1,4 @@
-// User エンティティと入力バリデーション。
+// User エンティティと入力バリデーション
 package model
 
 import (
@@ -35,7 +35,7 @@ func (u *User) IsMaster() bool {
 	return u != nil && u.Role == RoleMaster
 }
 
-// CanMatch はマッチング参加可能か（削除済み・master は不可）。
+// CanMatch はマッチング参加可能か（削除済み・master は不可）
 func (u *User) CanMatch() bool {
 	return u != nil && !u.IsDeleted() && !u.IsMaster()
 }

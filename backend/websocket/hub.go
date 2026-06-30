@@ -1,4 +1,4 @@
-// WebSocket Hub: 接続管理と Server → Client 通知。
+// WebSocket Hub: 接続管理と Server → Client 通知
 package websocket
 
 import (
@@ -89,7 +89,7 @@ func (h *Hub) SendPong(userID uuid.UUID) {
 	_ = h.SendRaw(userID, map[string]any{"type": "PONG"})
 }
 
-// SessionStore は Hub 切断 + Redis キー削除をまとめる。
+// SessionStore は Hub 切断 + Redis キー削除をまとめる
 type SessionStore struct {
 	Hub   *Hub
 	Redis model.WSSessionStore

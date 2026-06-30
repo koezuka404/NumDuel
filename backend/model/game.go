@@ -1,4 +1,4 @@
-// Game 集約ルート。対戦の状態遷移とルールを Entity メソッドで保証する。
+// Game 集約ルート対戦の状態遷移とルールを Entity メソッドで保証する
 package model
 
 import (
@@ -25,7 +25,7 @@ type Game struct {
 
 func (Game) TableName() string { return "games" }
 
-// IsParticipant は userID が player1 / player2 のいずれかか。
+// IsParticipant は userID が player1 / player2 のいずれかか
 func (g *Game) IsParticipant(userID uuid.UUID) bool {
 	if g == nil {
 		return false
@@ -33,7 +33,7 @@ func (g *Game) IsParticipant(userID uuid.UUID) bool {
 	return g.Player1ID == userID || g.Player2ID == userID
 }
 
-// IsCurrentTurn は userID が現在ターンのプレイヤーか。
+// IsCurrentTurn は userID が現在ターンのプレイヤーか
 func (g *Game) IsCurrentTurn(userID uuid.UUID) bool {
 	if g == nil || g.CurrentTurnPlayerID == nil {
 		return false
@@ -41,9 +41,9 @@ func (g *Game) IsCurrentTurn(userID uuid.UUID) bool {
 	return *g.CurrentTurnPlayerID == userID
 }
 
-// CanGuess は GUESS / 自動予想を受け付け可能か。
-//
-// 条件: status == IN_PROGRESS かつ 自分のターン。
+// CanGuess は GUESS / 自動予想を受け付け可能か
+
+// 条件: status == IN_PROGRESS かつ 自分のターン
 func (g *Game) CanGuess(userID uuid.UUID) bool {
 	if g == nil {
 		return false
@@ -51,8 +51,8 @@ func (g *Game) CanGuess(userID uuid.UUID) bool {
 	return g.Status == GameStatusInProgress && g.IsCurrentTurn(userID)
 }
 
-// BothSecretsSet は両プレイヤーの秘密数字ハッシュが登録済みか。
-// true になった時点で StartGameUseCase が Start を呼ぶ。
+// BothSecretsSet は両プレイヤーの秘密数字ハッシュが登録済みか
+// true になった時点で StartGameUseCase が Start を呼ぶ
 func (g *Game) BothSecretsSet() bool {
 	if g == nil {
 		return false
@@ -60,14 +60,14 @@ func (g *Game) BothSecretsSet() bool {
 	return g.Player1Secret != "" && g.Player2Secret != ""
 }
 
-// SetSecretHash はプレイヤーの秘密数字ハッシュを 1 回だけ登録（SetSecretNumberUseCase）。
-//
+// SetSecretHash はプレイヤーの秘密数字ハッシュを 1 回だけ登録（SetSecretNumberUseCase）
+
 // 前提:
-//   - status == WAITING_SECRET
-//   - 参加者であること
-//   - 自分の secret が未登録
-//
-// hash は Infrastructure.SecretHashService が生成。平文は UseCase スコープ外へ持ち出さない。
+// - status == WAITING_SECRET
+// - 参加者であること
+// - 自分の secret が未登録
+
+// hash は Infrastructure.SecretHashService が生成平文は UseCase スコープ外へ持ち出さない
 func (g *Game) SetSecretHash(playerID uuid.UUID, hash string) error {
 	if g == nil {
 		return errForbidden("game is nil")
@@ -92,12 +92,12 @@ func (g *Game) SetSecretHash(playerID uuid.UUID, hash string) error {
 	return nil
 }
 
-// SetSecret は SetSecretHash の別名。
+// SetSecret は SetSecretHash の別名
 func (g *Game) SetSecret(playerID uuid.UUID, hash string) error {
 	return g.SetSecretHash(playerID, hash)
 }
 
-// OpponentID は対戦相手の user ID を返す。
+// OpponentID は対戦相手の user ID を返す
 func (g *Game) OpponentID(userID uuid.UUID) (uuid.UUID, error) {
 	if g.Player1ID == userID {
 		return g.Player2ID, nil
@@ -108,8 +108,8 @@ func (g *Game) OpponentID(userID uuid.UUID) (uuid.UUID, error) {
 	return uuid.Nil, errForbidden("not a participant")
 }
 
-// OpponentSecretHash は予想照合対象の相手ハッシュと playerSlot(1|2) を返す。
-// SubmitGuessUseCase が SecretHashService.Verify に渡す。
+// OpponentSecretHash は予想照合対象の相手ハッシュと playerSlot(1|2) を返す
+// SubmitGuessUseCase が SecretHashService.Verify に渡す
 func (g *Game) OpponentSecretHash(userID uuid.UUID) (hash string, opponentSlot int, err error) {
 	if g.Player1ID == userID {
 		return g.Player2Secret, 2, nil
@@ -120,8 +120,8 @@ func (g *Game) OpponentSecretHash(userID uuid.UUID) (hash string, opponentSlot i
 	return "", 0, errForbidden("not a participant")
 }
 
-// PlayerSlot は参加者のスロット番号（1=player1, 2=player2）。
-// SecretHashService.Hash の playerSlot 引数に使用。
+// PlayerSlot は参加者のスロット番号（1=player1, 2=player2）
+// SecretHashService.Hash の playerSlot 引数に使用
 func (g *Game) PlayerSlot(userID uuid.UUID) (int, error) {
 	if g.Player1ID == userID {
 		return 1, nil
@@ -132,15 +132,15 @@ func (g *Game) PlayerSlot(userID uuid.UUID) (int, error) {
 	return 0, errForbidden("not a participant")
 }
 
-// Start は両者の秘密数字登録完了後に IN_PROGRESS へ遷移（StartGameUseCase）。
-//
+// Start は両者の秘密数字登録完了後に IN_PROGRESS へ遷移（StartGameUseCase）
+
 // 副作用:
-//   - status = IN_PROGRESS
-//   - current_turn = 1
-//   - current_turn_player_id = player1_id（先攻必須）
-//   - started_at = now
-//
-// Redis ターン期限・WS 通知は COMMIT 後に UseCase が行う。
+// - status = IN_PROGRESS
+// - current_turn = 1
+// - current_turn_player_id = player1_id（先攻必須）
+// - started_at = now
+
+// Redis ターン期限・WS 通知は COMMIT 後に UseCase が行う
 func (g *Game) Start(now time.Time) error {
 	if g == nil {
 		return errForbidden("game is nil")
@@ -156,8 +156,8 @@ func (g *Game) Start(now time.Time) error {
 	return nil
 }
 
-// advanceTurn は未勝利時のターン交代（内部用）。
-// current_turn を +1 し、手番を相手に移す。
+// advanceTurn は未勝利時のターン交代（内部用）
+// current_turn を +1 し、手番を相手に移す
 func (g *Game) advanceTurn(now time.Time) {
 	if g.CurrentTurnPlayerID == nil {
 		return
@@ -171,15 +171,15 @@ func (g *Game) advanceTurn(now time.Time) {
 	g.UpdatedAt = now
 }
 
-// AddGuess は予想を追加し、未勝利ならターンを進める。
-//
+// AddGuess は予想を追加し、未勝利ならターンを進める
+
 // 流れ:
-//  1. CanGuess 検証（失敗時 game_not_started / game_already_finished / not_your_turn）
-//  2. Guess Entity を生成（turn = current_turn のスナップショット）
-//  3. IsWin(results) == false なら advanceTurn
-//  4. IsWin == true ならターンは進めない（Finish は UseCase が FinishGameService で実行）
-//
-// Repository への INSERT は UseCase の TX 内で行う。
+// 1. CanGuess 検証（失敗時 game_not_started / game_already_finished / not_your_turn）
+// 2. Guess Entity を生成（turn = current_turn のスナップショット）
+// 3. IsWin(results) == false なら advanceTurn
+// 4. IsWin == true ならターンは進めない（Finish は UseCase が FinishGameService で実行）
+
+// Repository への INSERT は UseCase の TX 内で行う
 func (g *Game) AddGuess(
 	playerID uuid.UUID,
 	number GuessNumber,
@@ -203,14 +203,14 @@ func (g *Game) AddGuess(
 	return guess, nil
 }
 
-// Finish は guess_win による終了（FinishGameService）。
-//
-//   - status = FINISHED
-//   - winner_id = winnerID
-//   - current_turn_player_id = NULL
-//   - finished_at = now
-//
-// match_histories 作成・win_count 加算は UseCase / FinishGameService が同一 TX で行う。
+// Finish は guess_win による終了（FinishGameService）
+
+// - status = FINISHED
+// - winner_id = winnerID
+// - current_turn_player_id = NULL
+// - finished_at = now
+
+// match_histories 作成・win_count 加算は UseCase / FinishGameService が同一 TX で行う
 func (g *Game) Finish(winnerID uuid.UUID, now time.Time) error {
 	if g == nil {
 		return errForbidden("game is nil")
@@ -229,11 +229,11 @@ func (g *Game) Finish(winnerID uuid.UUID, now time.Time) error {
 	return nil
 }
 
-// CancelBySecretTimeout は秘密数字登録期限切れによる終了。
-//
-//   - status = FINISHED
-//   - winner_id = NULL（勝者なし）
-//   - MatchHistory は作成しない
+// CancelBySecretTimeout は秘密数字登録期限切れによる終了
+
+// - status = FINISHED
+// - winner_id = NULL（勝者なし）
+// - MatchHistory は作成しない
 func (g *Game) CancelBySecretTimeout(now time.Time) error {
 	if g == nil {
 		return errForbidden("game is nil")

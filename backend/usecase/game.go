@@ -11,7 +11,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// GameDeps はゲーム系 UseCase の依存関係。
+// GameDeps はゲーム系 UseCase の依存関係
 type GameDeps struct {
 	Repo         repository.IRepository
 	Tx           repository.TxManager
@@ -21,6 +21,7 @@ type GameDeps struct {
 	Random       model.GuessNumberGenerator
 	Notifier     model.EventNotifier
 	TurnDuration time.Duration
+	SecretSetup  time.Duration
 	GameLockTTL  time.Duration
 	Now          func() time.Time
 }

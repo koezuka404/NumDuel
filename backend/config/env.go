@@ -1,4 +1,4 @@
-// 環境変数の読み込みと起動時バリデーション。
+// 環境変数の読み込みと起動時バリデーション
 package config
 
 import (
@@ -19,17 +19,19 @@ type Config struct {
 	CookieSecure           bool
 	GameSecretPepper       string
 	GameLockSeconds        int
-	TurnDurationSeconds       int
-	TurnTimeoutPollSeconds    int
-	WSAllowedOrigins       []string
+	TurnDurationSeconds        int
+	TurnTimeoutPollSeconds     int
+	SecretSetupSeconds         int
+	SecretTimeoutPollSeconds   int
+	WSAllowedOrigins           []string
 }
 
-// Load は os.Getenv から設定を読み込む。
+// Load は os.Getenv から設定を読み込む
 func Load() (*Config, error) {
 	return LoadFromEnv(os.Getenv)
 }
 
-// LoadFromEnv は getenv から設定を読み込む（テスト用に注入可能）。
+// LoadFromEnv は getenv から設定を読み込む（テスト用に注入可能）
 func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	cfg := &Config{
 		DatabaseURL:            getenv("DATABASE_URL"),
@@ -42,7 +44,9 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		GameSecretPepper:       getenv("GAME_SECRET_PEPPER"),
 		GameLockSeconds:        envInt(getenv, "GAME_LOCK_SECONDS", 2),
 		TurnDurationSeconds:    envInt(getenv, "TURN_DURATION_SECONDS", 30),
-		TurnTimeoutPollSeconds: envInt(getenv, "TURN_TIMEOUT_POLL_SECONDS", 1),
+		TurnTimeoutPollSeconds:   envInt(getenv, "TURN_TIMEOUT_POLL_SECONDS", 1),
+		SecretSetupSeconds:       envInt(getenv, "SECRET_SETUP_SECONDS", 60),
+		SecretTimeoutPollSeconds: envInt(getenv, "SECRET_TIMEOUT_POLL_SECONDS", 1),
 	}
 	if raw := getenv("WS_ALLOWED_ORIGINS"); raw != "" {
 		for _, o := range strings.Split(raw, ",") {
@@ -69,7 +73,7 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	if cfg.Port <= 0 || cfg.JWTExpiryMinutes <= 0 || cfg.RefreshTokenExpiryDays <= 0 {
 		return nil, fmt.Errorf("invalid numeric config")
 	}
-	if cfg.GameLockSeconds <= 0 || cfg.TurnDurationSeconds <= 0 {
+	if cfg.GameLockSeconds <= 0 || cfg.TurnDurationSeconds <= 0 || cfg.SecretSetupSeconds <= 0 {
 		return nil, fmt.Errorf("invalid game timing config")
 	}
 	return cfg, nil
@@ -85,6 +89,14 @@ func (c *Config) TurnDuration() time.Duration {
 
 func (c *Config) TurnTimeoutPollInterval() time.Duration {
 	return time.Duration(c.TurnTimeoutPollSeconds) * time.Second
+}
+
+func (c *Config) SecretSetupDuration() time.Duration {
+	return time.Duration(c.SecretSetupSeconds) * time.Second
+}
+
+func (c *Config) SecretTimeoutPollInterval() time.Duration {
+	return time.Duration(c.SecretTimeoutPollSeconds) * time.Second
 }
 
 func envInt(getenv func(string) string, key string, fallback int) int {

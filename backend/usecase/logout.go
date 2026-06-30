@@ -16,7 +16,7 @@ type LogoutInput struct {
 	Exp    time.Time // JWT 有効期限（Redis TTL 計算用）
 }
 
-// Logout は JWT 失効、refresh 全失効、WS 切断、login_logs を記録する。
+// Logout は JWT 失効、refresh 全失効、WS 切断、login_logs を記録する
 func Logout(ctx context.Context, d AuthDeps, in LogoutInput) error {
 	now := d.now()
 	if in.JTI == "" || !now.Before(in.Exp) {

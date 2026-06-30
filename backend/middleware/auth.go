@@ -1,4 +1,4 @@
-// JWT 認証 Middleware。Cookie access_token を検証する。
+// JWT 認証 MiddlewareCookie access_token を検証する
 package middleware
 
 import (
@@ -17,7 +17,7 @@ type AuthConfig struct {
 	Repo        repository.IRepository
 }
 
-// Auth は HttpOnly Cookie access_token を検証し、ユーザー情報をコンテキストに保存する。
+// Auth は HttpOnly Cookie access_token を検証し、ユーザー情報をコンテキストに保存する
 func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

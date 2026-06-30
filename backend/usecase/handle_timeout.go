@@ -11,7 +11,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// HandleTimeout はターン期限切れ時に自動予想を 1 回実行する。
+// HandleTimeout はターン期限切れ時に自動予想を 1 回実行する
 func HandleTimeout(ctx context.Context, d GameDeps, gameID, playerID uuid.UUID) error {
 	now := d.now()
 	if d.Locks != nil {

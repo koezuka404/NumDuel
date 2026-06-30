@@ -1,4 +1,4 @@
-// パスワードハッシュ（bcrypt）と JWT / refresh トークンの生成・検証。
+// パスワードハッシュ（bcrypt）と JWT / refresh トークンの生成・検証
 package crypto
 
 import (
@@ -40,7 +40,7 @@ type accessClaims struct {
 	jwt.RegisteredClaims
 }
 
-// Issue は accessToken（JWT）を発行する。Claims: sub, role, jti, iat, exp
+// Issue は accessToken（JWT）を発行するClaims: sub, role, jti, iat, exp
 func (s *JWTService) Issue(userID uuid.UUID, role model.Role, now time.Time) (string, error) {
 	claims := accessClaims{
 		Role: string(role),
@@ -55,7 +55,7 @@ func (s *JWTService) Issue(userID uuid.UUID, role model.Role, now time.Time) (st
 	return token.SignedString(s.secret)
 }
 
-// AccessToken は Parse の結果。Middleware / Logout で使用。
+// AccessToken は Parse の結果Middleware / Logout で使用
 type AccessToken struct {
 	UserID    uuid.UUID
 	Role      model.Role
@@ -64,7 +64,7 @@ type AccessToken struct {
 	ExpiresAt time.Time
 }
 
-// Parse は JWT を検証して Claims を取り出す。期限切れは token_expired を返す。
+// Parse は JWT を検証して Claims を取り出す期限切れは token_expired を返す
 func (s *JWTService) Parse(tokenString string) (*AccessToken, error) {
 	claims := &accessClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
@@ -111,13 +111,13 @@ func (s *RefreshTokenService) Hash(plaintext string) string {
 	return hashRefreshToken(plaintext)
 }
 
-// hashRefreshToken は平文 refresh を SHA-256 hex に変換（DB 照合用）。
+// hashRefreshToken は平文 refresh を SHA-256 hex に変換（DB 照合用）
 func hashRefreshToken(plaintext string) string {
 	sum := sha256.Sum256([]byte(plaintext))
 	return hex.EncodeToString(sum[:])
 }
 
-// Generate は 64 バイト乱数 → hex 平文 + ハッシュのペアを生成。
+// Generate は 64 バイト乱数 → hex 平文 + ハッシュのペアを生成
 func (s *RefreshTokenService) Generate() (model.RefreshTokenPair, error) {
 	buf := make([]byte, 64)
 	if _, err := rand.Read(buf); err != nil {

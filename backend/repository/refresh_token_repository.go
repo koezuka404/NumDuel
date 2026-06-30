@@ -10,14 +10,14 @@ import (
 	"github.com/numduel/numduel/model"
 )
 
-// IRefreshTokenRepository は refresh_tokens テーブルへのアクセス。
+// IRefreshTokenRepository は refresh_tokens テーブルへのアクセス
 type GormRefreshTokenRepository struct {
 	baseRepo
 }
 
 var _ IRefreshTokenRepository = (*GormRefreshTokenRepository)(nil)
 
-// NewRefreshTokenRepository は RefreshTokenRepository を作成する。
+// NewRefreshTokenRepository は RefreshTokenRepository を作成する
 func NewRefreshTokenRepository(db *gorm.DB) IRefreshTokenRepository {
 	return &GormRefreshTokenRepository{baseRepo{db: db}}
 }

@@ -16,7 +16,7 @@ type RefreshTokenOutput struct {
 	RefreshToken string // ローテーション後の新平文
 }
 
-// RefreshToken は refresh を検証し、トークンローテーションで accessToken を再発行する。
+// RefreshToken は refresh を検証し、トークンローテーションで accessToken を再発行する
 func RefreshToken(ctx context.Context, d AuthDeps, in RefreshTokenInput) (*RefreshTokenOutput, error) {
 	if in.RefreshToken == "" {
 		return nil, model.ErrUnauthorized()

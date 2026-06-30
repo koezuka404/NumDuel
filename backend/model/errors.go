@@ -1,9 +1,9 @@
-// ドメイン層の業務エラー。HTTP ステータスへの変換は dto が担当。
+// ドメイン層の業務エラーHTTP ステータスへの変換は dto が担当
 package model
 
 import "fmt"
 
-// API レスポンス error.code と一致させる定数群。
+// API レスポンス error.code と一致させる定数群
 const (
 	CodeValidation          = "validation_error"
 	CodeInvalidDigitLength  = "invalid_digit_length"
@@ -32,7 +32,7 @@ type DomainError struct {
 	Msg  string
 }
 
-// Error は message があればそれを、なければ code を返す。
+// Error は message があればそれを、なければ code を返す
 func (e *DomainError) Error() string {
 	if e.Msg != "" {
 		return e.Msg

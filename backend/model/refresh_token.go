@@ -1,4 +1,4 @@
-// RefreshToken エンティティ。平文は Cookie のみ、DB にはハッシュを保存。
+// RefreshToken エンティティ平文は Cookie のみ、DB にはハッシュを保存
 package model
 
 import (
@@ -42,12 +42,12 @@ func NewRefreshToken(
 	}
 }
 
-// IsActive は status=active かつ期限内。
+// IsActive は status=active かつ期限内
 func (t *RefreshToken) IsActive(now time.Time) bool {
 	return t != nil && t.Status == RefreshTokenActive && now.Before(t.ExpiresAt)
 }
 
-// Revoke は status を revoked に更新する。
+// Revoke は status を revoked に更新する
 func (t *RefreshToken) Revoke(now time.Time) {
 	t.Status = RefreshTokenRevoked
 	t.RevokedAt = &now

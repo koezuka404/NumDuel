@@ -1,4 +1,4 @@
-// アプリケーションのエントリポイント。
+// アプリケーションのエントリポイント
 package main
 
 import (
@@ -76,7 +76,8 @@ func main() {
 	gameDeps := usecase.GameDeps{
 		Repo: dbSetup.Repo, Tx: dbSetup.Tx, Secrets: secretHasher,
 		Locks: redisStore, Turns: redisStore, Random: infrcrypto.NewRandomNumberService(), Notifier: hub,
-		TurnDuration: cfg.TurnDuration(), GameLockTTL: cfg.GameLockTTL(),
+		TurnDuration: cfg.TurnDuration(), SecretSetup: cfg.SecretSetupDuration(),
+		GameLockTTL: cfg.GameLockTTL(),
 	}
 	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx, Notifier: hub}
 	profileDeps := usecase.ProfileDeps{Repo: dbSetup.Repo}
@@ -129,6 +130,12 @@ func main() {
 			Store:    redisStore,
 			Game:     gameDeps,
 			Interval: cfg.TurnTimeoutPollInterval(),
+		}).Run(workerCtx)
+	}
+	if cfg.SecretTimeoutPollSeconds > 0 {
+		go (&worker.SecretSetupTimeoutWorker{
+			Game:     gameDeps,
+			Interval: cfg.SecretTimeoutPollInterval(),
 		}).Run(workerCtx)
 	}
 

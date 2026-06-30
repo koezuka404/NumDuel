@@ -1,5 +1,5 @@
-// API 共通の JSON レスポンス形式を提供する。
-// 成功: { "data": ... }  失敗: { "error": { "code", "message" } }
+// API 共通の JSON レスポンス形式を提供する
+// 成功: { "data": ... } 失敗: { "error": { "code", "message" } }
 package dto
 
 import (
@@ -14,7 +14,7 @@ func WriteData(c echo.Context, status int, data any) error {
 	return c.JSON(status, map[string]any{"data": data})
 }
 
-// WriteError は DomainError の code を HTTP ステータスに変換して返す。
+// WriteError は DomainError の code を HTTP ステータスに変換して返す
 func WriteError(c echo.Context, err error) error {
 	if de, ok := model.IsDomainError(err); ok {
 		return c.JSON(statusForCode(de.Code), map[string]any{

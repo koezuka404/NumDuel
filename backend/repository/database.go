@@ -2,7 +2,7 @@ package repository
 
 import "gorm.io/gorm"
 
-// DB は GORM 接続のラッパー（バックアップ同期など repository 内部用）。
+// DB は GORM 接続のラッパー（バックアップ同期など repository 内部用）
 type DB struct {
 	gorm *gorm.DB
 }

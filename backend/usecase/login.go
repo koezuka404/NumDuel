@@ -22,7 +22,7 @@ type LoginOutput struct {
 	Role         model.Role
 }
 
-// Login は認証し、JWT と refresh_token（DB にはハッシュのみ保存）を発行する。
+// Login は認証し、JWT と refresh_token（DB にはハッシュのみ保存）を発行する
 func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error) {
 	if err := model.ValidateLoginEmail(in.Email); err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error)
 	if err != nil {
 		return nil, model.ErrInternal("failed to generate refresh token")
 	}
-	// family_id は新規 UUID。同一ログインセッション内のローテーションで共有
+	// family_id は新規 UUID同一ログインセッション内のローテーションで共有
 	token := model.NewRefreshToken(user.ID, refreshPair.Hash, uuid.New(), now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
 	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
 		if err := tx.LoginLogs().Create(ctx, &model.LoginLog{

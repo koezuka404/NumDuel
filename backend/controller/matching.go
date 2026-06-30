@@ -1,4 +1,4 @@
-// マッチング API の HTTP ハンドラ。
+// マッチング API の HTTP ハンドラ
 package controller
 
 import (

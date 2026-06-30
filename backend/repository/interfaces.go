@@ -9,7 +9,7 @@ import (
 	"github.com/numduel/numduel/model"
 )
 
-// IUserRepository は users テーブルへのアクセス。
+// IUserRepository は users テーブルへのアクセス
 type IUserRepository interface {
 	Create(ctx context.Context, user *model.User) error
 	Update(ctx context.Context, user *model.User) error
@@ -22,7 +22,7 @@ type IUserRepository interface {
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]*model.User, error)
 }
 
-// IGameRepository は games テーブルへのアクセス。
+// IGameRepository は games テーブルへのアクセス
 type IGameRepository interface {
 	Create(ctx context.Context, game *model.Game) error
 	Update(ctx context.Context, game *model.Game) error
@@ -34,7 +34,7 @@ type IGameRepository interface {
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]*model.Game, error)
 }
 
-// IGuessRepository は guesses テーブルへのアクセス。
+// IGuessRepository は guesses テーブルへのアクセス
 type IGuessRepository interface {
 	Create(ctx context.Context, guess *model.Guess) error
 	ListByGameAndPlayer(ctx context.Context, gameID, playerID uuid.UUID) ([]model.Guess, error)
@@ -42,14 +42,14 @@ type IGuessRepository interface {
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]model.Guess, error)
 }
 
-// IMatchHistoryRepository は match_histories テーブルへのアクセス。
+// IMatchHistoryRepository は match_histories テーブルへのアクセス
 type IMatchHistoryRepository interface {
 	Create(ctx context.Context, history *model.MatchHistory) error
 	ListByUserID(ctx context.Context, userID uuid.UUID, page, limit int) ([]model.MatchHistory, int64, error)
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]model.MatchHistory, error)
 }
 
-// IMatchingQueueRepository は matching_queue テーブルへのアクセス。
+// IMatchingQueueRepository は matching_queue テーブルへのアクセス
 type IMatchingQueueRepository interface {
 	Insert(ctx context.Context, entry *model.MatchingQueueEntry) error
 	DeleteByIDs(ctx context.Context, ids []uuid.UUID) error
@@ -58,14 +58,14 @@ type IMatchingQueueRepository interface {
 	FindByUserID(ctx context.Context, userID uuid.UUID) (*model.MatchingQueueEntry, error)
 }
 
-// IRankingRepository は rankings テーブルへのアクセス。
+// IRankingRepository は rankings テーブルへのアクセス
 type IRankingRepository interface {
 	ReplaceAll(ctx context.Context, rankings []model.Ranking) error
 	ListAll(ctx context.Context) ([]model.Ranking, error)
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]model.Ranking, error)
 }
 
-// IRefreshTokenRepository は refresh_tokens テーブルへのアクセス。
+// IRefreshTokenRepository は refresh_tokens テーブルへのアクセス
 type IRefreshTokenRepository interface {
 	FindByTokenHash(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
 	FindByTokenHashWithUser(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
@@ -78,7 +78,7 @@ type IRefreshTokenRepository interface {
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
-// IActivityLogRepository は activity_logs テーブルへのアクセス。
+// IActivityLogRepository は activity_logs テーブルへのアクセス
 type IActivityLogRepository interface {
 	Create(ctx context.Context, log *model.ActivityLog) error
 	Search(ctx context.Context, logType string, userID *uuid.UUID, from, to *time.Time, page, limit int) ([]model.ActivityLog, int64, error)
@@ -86,7 +86,7 @@ type IActivityLogRepository interface {
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]model.ActivityLog, error)
 }
 
-// ILoginLogRepository は login_logs テーブルへのアクセス。
+// ILoginLogRepository は login_logs テーブルへのアクセス
 type ILoginLogRepository interface {
 	Create(ctx context.Context, log *model.LoginLog) error
 	ListByUserID(ctx context.Context, userID uuid.UUID, page, limit int) ([]model.LoginLog, int64, error)
@@ -94,7 +94,7 @@ type ILoginLogRepository interface {
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]model.LoginLog, error)
 }
 
-// IWSConnectionLogRepository は ws_connection_logs テーブルへのアクセス。
+// IWSConnectionLogRepository は ws_connection_logs テーブルへのアクセス
 type IWSConnectionLogRepository interface {
 	Create(ctx context.Context, log *model.WSConnectionLog) error
 	UpdateDisconnected(ctx context.Context, id uuid.UUID, disconnectedAt time.Time) error
@@ -102,7 +102,7 @@ type IWSConnectionLogRepository interface {
 	DeleteOlderThan(ctx context.Context, before time.Time, batchSize int) (int64, error)
 }
 
-// IRepository は各テーブル用 Repository へのアクセサを提供する。
+// IRepository は各テーブル用 Repository へのアクセサを提供する
 type IRepository interface {
 	Users() IUserRepository
 	Games() IGameRepository

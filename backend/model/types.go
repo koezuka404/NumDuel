@@ -1,4 +1,4 @@
-// 列挙型・定数。DB カラム値と API レスポンスで共通利用。
+// 列挙型・定数DB カラム値と API レスポンスで共通利用
 package model
 
 type GameStatus string

@@ -1,4 +1,4 @@
-// HTTP ルート定義。Middleware → Controller への振り分けのみ行う。
+// HTTP ルート定義Middleware → Controller への振り分けのみ行う
 package router
 
 import (

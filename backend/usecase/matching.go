@@ -10,7 +10,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// MatchingDeps はマッチング UseCase の依存関係。
+// MatchingDeps はマッチング UseCase の依存関係
 type MatchingDeps struct {
 	Repo     repository.IRepository
 	Tx       repository.TxManager
@@ -38,7 +38,7 @@ type GetMatchingStatusOutput struct {
 	GameID *uuid.UUID // matched 時のみ
 }
 
-// MatchPlayers は待機キュー先頭 2 人をペアリングして Game を作成する（同一 TX 内）。
+// MatchPlayers は待機キュー先頭 2 人をペアリングして Game を作成する（同一 TX 内）
 func MatchPlayers(ctx context.Context, d MatchingDeps, tx repository.ITxRepos) (*model.Game, error) {
 	entries, err := tx.MatchingQueue().ListByStatusForUpdate(ctx, model.MatchingQueueWaiting, 2)
 	if err != nil {
@@ -76,7 +76,7 @@ func MatchPlayers(ctx context.Context, d MatchingDeps, tx repository.ITxRepos) (
 	return game, nil
 }
 
-// StartMatching はキュー登録後、同一 TX 内で MatchPlayers を呼ぶ。
+// StartMatching はキュー登録後、同一 TX 内で MatchPlayers を呼ぶ
 func StartMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*StartMatchingOutput, error) {
 	user, err := d.Repo.Users().FindByID(ctx, userID)
 	if err != nil {

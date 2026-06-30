@@ -85,7 +85,7 @@ func userWaitingInMatchingQueue(ctx context.Context, repo repository.IRepository
 	return entry.Status == model.MatchingQueueWaiting, nil
 }
 
-// FindActiveGameForUser は waiting_secret / in_progress の対戦中ゲームを返す。
+// FindActiveGameForUser は waiting_secret / in_progress の対戦中ゲームを返す
 func FindActiveGameForUser(ctx context.Context, repo repository.IRepository, userID uuid.UUID) (*model.Game, error) {
 	games, err := repo.Games().ListByPlayerID(ctx, userID)
 	if err != nil {

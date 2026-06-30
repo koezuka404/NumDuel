@@ -27,7 +27,7 @@ type RankingItem struct {
 	WinCount int
 }
 
-// GetRanking は上位 3 名を返す（仕様 6.8.1）。
+// GetRanking は上位 3 名を返す
 func GetRanking(ctx context.Context, d RankingDeps) ([]RankingItem, error) {
 	rows, err := d.Repo.Rankings().ListAll(ctx)
 	if err != nil {
@@ -43,7 +43,7 @@ func GetRanking(ctx context.Context, d RankingDeps) ([]RankingItem, error) {
 	return out, nil
 }
 
-// RebuildRanking は users.win_count から rankings を全件再集計する。
+// RebuildRanking は users.win_count から rankings を全件再集計する
 func RebuildRanking(ctx context.Context, d RankingDeps) error {
 	rows, err := listUsersForRankingRebuild(ctx, d.Repo)
 	if err != nil {

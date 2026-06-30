@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ActivityLog は activity_logs テーブルのレコード。
+// ActivityLog は activity_logs テーブルのレコード
 type ActivityLog struct {
 	ID        uuid.UUID       `gorm:"type:uuid;primaryKey"`
 	UserID    *uuid.UUID      `gorm:"type:uuid"`
@@ -19,7 +19,7 @@ type ActivityLog struct {
 
 func (ActivityLog) TableName() string { return "activity_logs" }
 
-// LoginLog は login_logs テーブルのレコード。
+// LoginLog は login_logs テーブルのレコード
 type LoginLog struct {
 	ID        uuid.UUID   `gorm:"type:uuid;primaryKey"`
 	UserID    uuid.UUID   `gorm:"type:uuid;not null"`
@@ -30,7 +30,7 @@ type LoginLog struct {
 
 func (LoginLog) TableName() string { return "login_logs" }
 
-// WSConnectionLog は ws_connection_logs テーブルのレコード。
+// WSConnectionLog は ws_connection_logs テーブルのレコード
 type WSConnectionLog struct {
 	ID             uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	UserID         uuid.UUID  `gorm:"type:uuid;not null"`

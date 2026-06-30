@@ -85,6 +85,8 @@ services:
       PORT: "8080"
       REDIS_ADDR: redis:6379
       TURN_TIMEOUT_POLL_SECONDS: "1"
+      SECRET_SETUP_SECONDS: "60"
+      SECRET_TIMEOUT_POLL_SECONDS: "1"
     ports:
       - "8080:8080"
     healthcheck:

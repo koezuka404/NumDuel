@@ -1,6 +1,6 @@
 package repository
 
-// Repository は IRepository の GORM 実装。テーブルごとにサブリポジトリを持つ。
+// Repository は IRepository の GORM 実装テーブルごとにサブリポジトリを持つ
 type Repository struct {
 	users            *userRepository
 	games            *gameRepository

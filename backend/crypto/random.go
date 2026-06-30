@@ -15,7 +15,7 @@ func NewRandomNumberService() *RandomNumberService {
 	return &RandomNumberService{}
 }
 
-// GenerateGuessNumber は重複なし 4 桁（0〜9 から 4 つ）を crypto/rand で生成する。
+// GenerateGuessNumber は重複なし 4 桁（0〜9 から 4 つ）を crypto/rand で生成する
 func (s *RandomNumberService) GenerateGuessNumber() (model.GuessNumber, error) {
 	pool := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	for i := 0; i < 4; i++ {

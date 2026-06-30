@@ -15,7 +15,7 @@ type GetMeOutput struct {
 	WinCount int
 }
 
-// GetMe は JWT で特定されたユーザーの基本情報を返す。
+// GetMe は JWT で特定されたユーザーの基本情報を返す
 func GetMe(ctx context.Context, d AuthDeps, userID uuid.UUID) (*GetMeOutput, error) {
 	user, err := d.Repo.Users().FindByID(ctx, userID)
 	if err != nil {

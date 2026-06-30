@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// ITxRepos はトランザクション内で使う Repository 群を Usecase へ渡す窓口。
+// ITxRepos はトランザクション内で使う Repository 群を Usecase へ渡す窓口
 type ITxRepos interface {
 	Users() IUserRepository
 	Games() IGameRepository
@@ -18,12 +18,12 @@ type ITxRepos interface {
 	LoginLogs() ILoginLogRepository
 }
 
-// TxManager は複数 DB 更新を 1 トランザクションとして実行する。
+// TxManager は複数 DB 更新を 1 トランザクションとして実行する
 type TxManager interface {
 	WithinTx(ctx context.Context, fn func(ctx context.Context, tx ITxRepos) error) error
 }
 
-// GormTxManager は GORM の transaction 開始・commit・rollback を担当する。
+// GormTxManager は GORM の transaction 開始・commit・rollback を担当する
 type GormTxManager struct {
 	db *gorm.DB
 }
@@ -39,12 +39,12 @@ type gormTxRepos struct {
 	loginLogs      *loginLogRepository
 }
 
-// NewTxManager は TxManager を作成する。
+// NewTxManager は TxManager を作成する
 func NewTxManager(database *gorm.DB) TxManager {
 	return &GormTxManager{db: database}
 }
 
-// WithinTx は fn を GORM transaction 内で実行する。fn が error を返した場合は rollback する。
+// WithinTx は fn を GORM transaction 内で実行するfn が error を返した場合は rollback する
 func (m *GormTxManager) WithinTx(ctx context.Context, fn func(ctx context.Context, tx ITxRepos) error) error {
 	return m.db.WithContext(ctx).Transaction(func(txDB *gorm.DB) error {
 		txRepos := &gormTxRepos{

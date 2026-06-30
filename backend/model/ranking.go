@@ -6,13 +6,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// MatchHistory は勝敗履歴 Entity（読み取り専用モデル）。
-//
+// MatchHistory は勝敗履歴 Entity（読み取り専用モデル）
+
 // 作成条件:
-//   - guess_win でゲーム終了したときのみ FinishGameService が INSERT
-//   - secret_setup_timeout では作成しない
-//
-// ユーザー名はスナップショットとして保存（後から username が変わっても履歴は不変）。
+// - guess_win でゲーム終了したときのみ FinishGameService が INSERT
+// - secret_setup_timeout では作成しない
+
+// ユーザー名はスナップショットとして保存（後から username が変わっても履歴は不変）
 type MatchHistory struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
 	GameID         uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
@@ -27,7 +27,7 @@ type MatchHistory struct {
 
 func (MatchHistory) TableName() string { return "match_histories" }
 
-// NewMatchHistory は FinishGameService 内で勝敗確定時に呼ぶファクトリ。
+// NewMatchHistory は FinishGameService 内で勝敗確定時に呼ぶファクトリ
 func NewMatchHistory(
 	gameID, winnerID, loserID uuid.UUID,
 	winnerUsername, loserUsername string,
@@ -47,14 +47,14 @@ func NewMatchHistory(
 	}
 }
 
-// Ranking はランキング Read Model（CQRS, rankings テーブル）。
-//
+// Ranking はランキング Read Model（CQRS, rankings テーブル）
+
 // 更新:
-//   - 対戦 TX からは更新しない
-//   - RebuildRankingUseCase / RankingRebuildWorker が users.win_count から全件再集計
-//
-// 除外: 削除済みユーザー、master ロール。
-// UpdatedAt はバッチ完了時刻（UI「最終更新」表示用）。
+// - 対戦 TX からは更新しない
+// - RebuildRankingUseCase / RankingRebuildWorker が users.win_count から全件再集計
+
+// 除外: 削除済みユーザー、master ロール
+// UpdatedAt はバッチ完了時刻（UI「最終更新」表示用）
 type Ranking struct {
 	UserID    uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Rank      int       `gorm:"not null;index"`
@@ -65,7 +65,7 @@ type Ranking struct {
 
 func (Ranking) TableName() string { return "rankings" }
 
-// NewRanking は RebuildRankingUseCase が rankings 行を組み立てる際に使用。
+// NewRanking は RebuildRankingUseCase が rankings 行を組み立てる際に使用
 func NewRanking(userID uuid.UUID, rank int, username string, winCount int, updatedAt time.Time) Ranking {
 	return Ranking{
 		UserID:    userID,
@@ -76,7 +76,7 @@ func NewRanking(userID uuid.UUID, rank int, username string, winCount int, updat
 	}
 }
 
-// RankingRebuildRow は RebuildRankingUseCase が users から集計する 1 行。
+// RankingRebuildRow は RebuildRankingUseCase が users から集計する 1 行
 type RankingRebuildRow struct {
 	UserID   uuid.UUID
 	Username string

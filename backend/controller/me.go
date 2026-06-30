@@ -1,4 +1,4 @@
-// ログインユーザー向け API。
+// ログインユーザー向け API
 package controller
 
 import (
