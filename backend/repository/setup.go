@@ -1,9 +1,10 @@
-// 起動時の DB 初期化（接続・マイグレーション・バックアップ設定）
 package repository
 
 import (
 	"context"
 	"fmt"
+
+	"gorm.io/gorm"
 
 	"github.com/numduel/numduel/db"
 )
@@ -11,14 +12,13 @@ import (
 type SetupConfig struct {
 	DatabaseURL       string
 	BackupDatabaseURL string
-	Migrate           bool // false のときマイグレーションをスキップ（server 起動時は migrate 済み想定）
+	Migrate           bool
 }
 
 type SetupResult struct {
-	Primary *DB
-	Backup  *DB
-	Repo    IRepository
-	Tx      ITxManager
+	Primary *gorm.DB
+	Backup  *gorm.DB
+	Repos   Repos
 	Syncer  *BackupSyncer
 }
 
@@ -30,8 +30,10 @@ func Setup(_ context.Context, cfg SetupConfig) (*SetupResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("primary database: %w", err)
 	}
-	repo := NewRepository(primary)
-	result := &SetupResult{Primary: primary, Repo: repo, Tx: NewTxManager(primary.Gorm())}
+	result := &SetupResult{
+		Primary: primary,
+		Repos:   NewRepos(primary),
+	}
 	if cfg.BackupDatabaseURL == "" {
 		return result, nil
 	}
@@ -44,7 +46,7 @@ func Setup(_ context.Context, cfg SetupConfig) (*SetupResult, error) {
 	return result, nil
 }
 
-func openDB(dsn string, migrate bool) (*DB, error) {
+func openDB(dsn string, migrate bool) (*gorm.DB, error) {
 	gdb, err := db.Open(dsn)
 	if err != nil {
 		return nil, err
@@ -54,5 +56,5 @@ func openDB(dsn string, migrate bool) (*DB, error) {
 			return nil, err
 		}
 	}
-	return NewDB(gdb), nil
+	return gdb, nil
 }

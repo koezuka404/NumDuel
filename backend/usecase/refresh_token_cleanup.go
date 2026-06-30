@@ -12,7 +12,7 @@ const defaultRefreshTokenCleanupGraceDays = 7
 
 // RefreshTokenCleanupDeps は RefreshTokenCleanupWorker / RunRefreshTokenCleanup の依存
 type RefreshTokenCleanupDeps struct {
-	Repo      repository.IRepository
+	Repo      repository.Repos
 	GraceDays int
 	Now       func() time.Time
 }
@@ -28,7 +28,7 @@ func RunRefreshTokenCleanup(ctx context.Context, d RefreshTokenCleanupDeps) {
 	}
 	cutoff := d.now().AddDate(0, 0, -graceDays)
 
-	n, err := d.Repo.RefreshTokens().DeleteExpired(ctx, cutoff)
+	n, err := d.Repo.RefreshToken.DeleteExpired(ctx, cutoff)
 	if err != nil {
 		if err != context.Canceled && err != context.DeadlineExceeded {
 			log.Printf("refresh token cleanup: %v", err)

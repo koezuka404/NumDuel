@@ -14,8 +14,8 @@ func CancelGameBySecretTimeout(ctx context.Context, d GameDeps, gameID uuid.UUID
 	now := d.now()
 	var player1, player2 uuid.UUID
 	cancelled := false
-	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		game, err := tx.Games().FindByIDForUpdate(ctx, gameID)
+	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		game, err := d.Repo.Game.FindByIDForUpdate(ctx, gameID)
 		if err != nil {
 			return model.ErrInternal("failed to find game")
 		}
@@ -35,7 +35,7 @@ func CancelGameBySecretTimeout(ctx context.Context, d GameDeps, gameID uuid.UUID
 		if err := game.CancelBySecretTimeout(now); err != nil {
 			return err
 		}
-		if err := tx.Games().Update(ctx, game); err != nil {
+		if err := d.Repo.Game.Update(ctx, game); err != nil {
 			return model.ErrInternal("failed to cancel game")
 		}
 		player1, player2 = game.Player1ID, game.Player2ID

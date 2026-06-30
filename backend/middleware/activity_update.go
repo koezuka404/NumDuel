@@ -12,7 +12,7 @@ import (
 // ActivityUpdateConfig は ActivityUpdate の依存関係
 // Auth 通過後の protected ルートでのみ last_activity_at を更新する
 type ActivityUpdateConfig struct {
-	Repo repository.IRepository
+	Repo repository.Repos
 }
 
 // ActivityUpdate は認証済みリクエスト処理後に last_activity_at を now に更新する
@@ -29,7 +29,7 @@ func ActivityUpdate(cfg ActivityUpdateConfig) echo.MiddlewareFunc {
 				return err
 			}
 			now := time.Now().UTC()
-			_ = cfg.Repo.Users().TouchLastActivity(c.Request().Context(), auth.UserID, now)
+			_ = cfg.Repo.User.TouchLastActivity(c.Request().Context(), auth.UserID, now)
 			return err
 		}
 	}

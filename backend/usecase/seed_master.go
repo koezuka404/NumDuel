@@ -22,17 +22,17 @@ func SeedMaster(ctx context.Context, d AuthDeps, in SeedMasterInput) error {
 	if in.Email == "" || in.Password == "" {
 		return nil
 	}
-	exists, err := d.Repo.Users().ExistsActiveMaster(ctx)
+	exists, err := d.Repo.User.ExistsActiveMaster(ctx)
 	if err != nil {
 		return model.ErrInternal("failed to check master user")
 	}
 	if exists {
 		return nil
 	}
-	if err := model.ValidateLoginEmail(in.Email); err != nil {
+	if err := ValidateLoginEmail(in.Email); err != nil {
 		return err
 	}
-	if err := model.ValidatePassword(in.Password); err != nil {
+	if err := ValidatePassword(in.Password); err != nil {
 		return err
 	}
 	dup, err := emailOrUsernameExists(ctx, d.Repo, in.Email, masterUsername)
@@ -57,7 +57,7 @@ func SeedMaster(ctx context.Context, d AuthDeps, in SeedMasterInput) error {
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		return tx.Users().Create(ctx, user)
+	return repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		return d.Repo.User.Create(ctx, user)
 	})
 }

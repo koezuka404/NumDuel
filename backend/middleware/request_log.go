@@ -18,7 +18,7 @@ import (
 
 // RequestLogConfig は RequestLog の依存関係
 type RequestLogConfig struct {
-	Repo repository.IRepository
+	Repo repository.Repos
 }
 
 // RequestLog は HTTP メタデータを activity_logs（log_type: http_request）へ非同期 INSERT する
@@ -62,7 +62,7 @@ func RequestLog(cfg RequestLogConfig) echo.MiddlewareFunc {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer cancel()
-				if createErr := cfg.Repo.ActivityLogs().Create(ctx, entry); createErr != nil {
+				if createErr := cfg.Repo.ActivityLog.Create(ctx, entry); createErr != nil {
 					log.Printf("request log: create activity log: %v", createErr)
 				}
 			}()

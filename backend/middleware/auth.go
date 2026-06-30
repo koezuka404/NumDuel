@@ -14,7 +14,7 @@ type AuthConfig struct {
 	JWT         *infrcrypto.JWTService
 	Revoker     model.IJWTRevoker
 	ForceLogout model.IForceLogoutStore
-	Repo        repository.IRepository
+	Repo        repository.Repos
 }
 
 // Auth は HttpOnly Cookie access_token を検証し、ユーザー情報をコンテキストに保存する
@@ -48,7 +48,7 @@ func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 				}
 			}
 			if cfg.Repo != nil {
-				user, err := cfg.Repo.Users().FindByID(c.Request().Context(), token.UserID)
+				user, err := cfg.Repo.User.FindByID(c.Request().Context(), token.UserID)
 				if err != nil {
 					return dto.WriteError(c, model.ErrInternal("failed to find user"))
 				}

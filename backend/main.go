@@ -42,9 +42,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("database setup: %v", err)
 	}
-	defer closeGormDB(dbSetup.Primary.Gorm())
+	defer closeGormDB(dbSetup.Primary)
 	if dbSetup.Backup != nil {
-		defer closeGormDB(dbSetup.Backup.Gorm())
+		defer closeGormDB(dbSetup.Backup)
 	}
 
 	jwtService, err := infrcrypto.NewJWTService(cfg.JWTSecret, cfg.JWTExpiryMinutes)
@@ -66,8 +66,7 @@ func main() {
 	sessionStore := infrws.NewSessionStore(hub, redisStore)
 
 	authDeps := usecase.AuthDeps{
-		Repo:                   dbSetup.Repo,
-		Tx:                     dbSetup.Tx,
+		Repo:                   dbSetup.Repos,
 		Passwords:              infrcrypto.NewPasswordService(),
 		AccessTokens:           jwtService,
 		RefreshTokens:          infrcrypto.NewRefreshTokenService(),
@@ -76,21 +75,21 @@ func main() {
 		RefreshTokenExpiryDays: cfg.RefreshTokenExpiryDays,
 	}
 	gameDeps := usecase.GameDeps{
-		Repo: dbSetup.Repo, Tx: dbSetup.Tx, Secrets: secretHasher,
+		Repo: dbSetup.Repos, Secrets: secretHasher,
 		Locks: redisStore, Turns: redisStore, Random: infrcrypto.NewRandomNumberService(), Notifier: hub,
 		TurnDuration: cfg.TurnDuration(), SecretSetup: cfg.SecretSetupDuration(),
 		GameLockTTL: cfg.GameLockTTL(),
 	}
-	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx, Notifier: hub}
-	profileDeps := usecase.ProfileDeps{Repo: dbSetup.Repo}
-	rankingDeps := usecase.RankingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx}
+	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repos, Notifier: hub}
+	profileDeps := usecase.ProfileDeps{Repo: dbSetup.Repos}
+	rankingDeps := usecase.RankingDeps{Repo: dbSetup.Repos}
 	adminDeps := usecase.AdminDeps{
-		Repo: dbSetup.Repo, Tx: dbSetup.Tx, WSSessions: sessionStore,
+		Repo: dbSetup.Repos, WSSessions: sessionStore,
 		ForceLogout: redisStore, BackupStatus: redisStore,
 		Locks: redisStore, AdminLockTTL: cfg.AdminLockTTL(),
 	}
 	wsAuthDeps := usecase.WSAuthDeps{
-		Repo: dbSetup.Repo, JWT: jwtService,
+		Repo: dbSetup.Repos, JWT: jwtService,
 		Revoker: redisStore, ForceLogout: redisStore, Notifier: hub,
 	}
 
@@ -105,7 +104,7 @@ func main() {
 	}
 
 	autoLogoutDeps := usecase.AutoLogoutDeps{
-		Repo: dbSetup.Repo, Tx: dbSetup.Tx, ForceLogout: redisStore,
+		Repo: dbSetup.Repos, ForceLogout: redisStore,
 		SessionTimeout: cfg.SessionTimeout(),
 		// WS 接続中なら unauthorized を返してから切断
 		ForceDisconnect: func(ctx context.Context, userID uuid.UUID) error {
@@ -127,12 +126,12 @@ func main() {
 	e.Use(
 		middleware.Recover(),
 		middleware.CORS(cfg.CORSAllowedOrigins),
-		middleware.RequestLog(middleware.RequestLogConfig{Repo: dbSetup.Repo}),
+		middleware.RequestLog(middleware.RequestLogConfig{Repo: dbSetup.Repos}),
 	)
 	e.GET("/health", func(c echo.Context) error {
 		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
 		defer cancel()
-		if err := db.Ping(pingCtx, dbSetup.Primary.Gorm()); err != nil {
+		if err := db.Ping(pingCtx, dbSetup.Primary); err != nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]any{
 				"error": map[string]string{"code": "internal_error", "message": "database unavailable"},
 			})
@@ -146,10 +145,10 @@ func main() {
 		WSAuth: wsAuthDeps, WS: wsHandler, JWT: jwtService,
 		AuthMW: middleware.AuthConfig{
 			JWT: jwtService, Revoker: redisStore,
-			ForceLogout: redisStore, Repo: dbSetup.Repo,
+			ForceLogout: redisStore, Repo: dbSetup.Repos,
 		},
 		// protected API ごとに last_activity_at を更新（AutoLogoutWorker 連携）
-		Activity: middleware.ActivityUpdateConfig{Repo: dbSetup.Repo},
+		Activity: middleware.ActivityUpdateConfig{Repo: dbSetup.Repos},
 		Cfg: cfg,
 	})
 
@@ -196,7 +195,7 @@ func main() {
 	if cfg.LogRetentionCron != "" {
 		go (&worker.LogRetentionWorker{
 			Deps: usecase.LogRetentionDeps{
-				Repo:                     dbSetup.Repo,
+				Repo:                     dbSetup.Repos,
 				ActivityLogRetentionDays: cfg.ActivityLogRetentionDays,
 				LoginLogRetentionDays:    cfg.LoginLogRetentionDays,
 				WSLogRetentionDays:       cfg.WSLogRetentionDays,
@@ -209,7 +208,7 @@ func main() {
 	if cfg.RefreshTokenCleanupCron != "" {
 		go (&worker.RefreshTokenCleanupWorker{
 			Deps: usecase.RefreshTokenCleanupDeps{
-				Repo:      dbSetup.Repo,
+				Repo:      dbSetup.Repos,
 				GraceDays: cfg.RefreshTokenCleanupGraceDays,
 			},
 			Cron: cfg.RefreshTokenCleanupCron,

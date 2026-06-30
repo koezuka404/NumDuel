@@ -1,5 +1,5 @@
 // API 共通の JSON レスポンス形式を提供する
-// 成功: { "data": ... } 失敗: { "error": { "code", "message" } }
+// 成功: { "data": . } 失敗: { "error": { "code", "message" } }
 package dto
 
 import (

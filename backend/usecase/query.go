@@ -11,40 +11,46 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-func findUserByEmailActive(ctx context.Context, repo repository.IRepository, email string) (*model.User, error) {
-	user, err := repo.Users().FindByEmail(ctx, email)
+func findUserByEmailActive(ctx context.Context, repo repository.Repos, email string) (*model.User, error) {
+	user, err := repo.User.FindByEmail(ctx, email)
 	if err != nil || user == nil || user.IsDeleted() {
 		return nil, err
 	}
 	return user, nil
 }
 
-func emailOrUsernameExists(ctx context.Context, repo repository.IRepository, email, username string) (bool, error) {
-	byEmail, err := repo.Users().FindByEmail(ctx, email)
+func emailOrUsernameExists(ctx context.Context, repo repository.Repos, email, username string) (bool, error) {
+	byEmail, err := repo.User.FindByEmail(ctx, email)
 	if err != nil {
 		return false, err
 	}
 	if byEmail != nil {
 		return true, nil
 	}
-	byUsername, err := repo.Users().FindByUsername(ctx, username)
+	byUsername, err := repo.User.FindByUsername(ctx, username)
 	if err != nil {
 		return false, err
 	}
 	return byUsername != nil, nil
 }
 
-func listUsersForRankingRebuild(ctx context.Context, repo repository.IRepository) ([]model.RankingRebuildRow, error) {
-	users, err := repo.Users().ListAll(ctx)
+type rankingRebuildRow struct {
+	UserID   uuid.UUID
+	Username string
+	WinCount int
+}
+
+func listUsersForRankingRebuild(ctx context.Context, repo repository.Repos) ([]rankingRebuildRow, error) {
+	users, err := repo.User.ListAll(ctx)
 	if err != nil {
 		return nil, err
 	}
-	rows := make([]model.RankingRebuildRow, 0, len(users))
+	rows := make([]rankingRebuildRow, 0, len(users))
 	for _, u := range users {
 		if u.IsDeleted() || u.IsMaster() {
 			continue
 		}
-		rows = append(rows, model.RankingRebuildRow{
+		rows = append(rows, rankingRebuildRow{
 			UserID:   u.ID,
 			Username: u.Username,
 			WinCount: u.WinCount,
@@ -59,26 +65,26 @@ func listUsersForRankingRebuild(ctx context.Context, repo repository.IRepository
 	return rows, nil
 }
 
-func incrementUserWinCount(ctx context.Context, tx repository.ITxRepos, userID uuid.UUID, now time.Time) error {
-	user, err := tx.Users().FindByID(ctx, userID)
+func incrementUserWinCount(ctx context.Context, repos repository.Repos, userID uuid.UUID, now time.Time) error {
+	user, err := repos.User.FindByID(ctx, userID)
 	if err != nil || user == nil {
 		return model.ErrInternal("failed to find user")
 	}
 	user.WinCount++
 	user.UpdatedAt = now
-	return tx.Users().Update(ctx, user)
+	return repos.User.Update(ctx, user)
 }
 
-func revokeRefreshTokensByUserID(ctx context.Context, tx repository.ITxRepos, userID uuid.UUID, now time.Time) error {
-	return tx.RefreshTokens().RevokeByUserID(ctx, userID, now)
+func revokeRefreshTokensByUserID(ctx context.Context, repos repository.Repos, userID uuid.UUID, now time.Time) error {
+	return repos.RefreshToken.RevokeByUserID(ctx, userID, now)
 }
 
-func revokeRefreshTokenFamily(ctx context.Context, tx repository.ITxRepos, familyID uuid.UUID, now time.Time) error {
-	return tx.RefreshTokens().RevokeByFamilyID(ctx, familyID, now)
+func revokeRefreshTokenFamily(ctx context.Context, repos repository.Repos, familyID uuid.UUID, now time.Time) error {
+	return repos.RefreshToken.RevokeByFamilyID(ctx, familyID, now)
 }
 
-func userWaitingInMatchingQueue(ctx context.Context, repo repository.IRepository, userID uuid.UUID) (bool, error) {
-	entry, err := repo.MatchingQueue().FindByUserID(ctx, userID)
+func userWaitingInMatchingQueue(ctx context.Context, repo repository.Repos, userID uuid.UUID) (bool, error) {
+	entry, err := repo.MatchingQueue.FindByUserID(ctx, userID)
 	if err != nil || entry == nil {
 		return false, err
 	}
@@ -86,8 +92,8 @@ func userWaitingInMatchingQueue(ctx context.Context, repo repository.IRepository
 }
 
 // FindActiveGameForUser は waiting_secret / in_progress の対戦中ゲームを返す
-func FindActiveGameForUser(ctx context.Context, repo repository.IRepository, userID uuid.UUID) (*model.Game, error) {
-	games, err := repo.Games().ListByPlayerID(ctx, userID)
+func FindActiveGameForUser(ctx context.Context, repo repository.Repos, userID uuid.UUID) (*model.Game, error) {
+	games, err := repo.Game.ListByPlayerID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

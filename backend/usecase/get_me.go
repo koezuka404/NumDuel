@@ -17,7 +17,7 @@ type GetMeOutput struct {
 
 // GetMe は JWT で特定されたユーザーの基本情報を返す
 func GetMe(ctx context.Context, d AuthDeps, userID uuid.UUID) (*GetMeOutput, error) {
-	user, err := d.Repo.Users().FindByID(ctx, userID)
+	user, err := d.Repo.User.FindByID(ctx, userID)
 	if err != nil {
 		return nil, model.ErrInternal("failed to find user")
 	}

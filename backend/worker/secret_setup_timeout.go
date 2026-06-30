@@ -36,7 +36,7 @@ func (w *SecretSetupTimeoutWorker) tick(ctx context.Context, now time.Time) {
 		return
 	}
 	before := now.Add(-w.Game.SecretSetup)
-	games, err := w.Game.Repo.Games().ListByStatusCreatedBefore(ctx, model.GameStatusWaitingSecret, before)
+	games, err := w.Game.Repo.Game.ListByStatusCreatedBefore(ctx, model.GameStatusWaitingSecret, before)
 	if err != nil {
 		log.Printf("secret setup timeout worker: list games: %v", err)
 		return

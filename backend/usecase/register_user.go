@@ -24,13 +24,13 @@ type RegisterUserOutput struct {
 
 // RegisterUser は新規ユーザーを登録するJWT / refresh / login_logs は作成しない
 func RegisterUser(ctx context.Context, d AuthDeps, in RegisterUserInput) (*RegisterUserOutput, error) {
-	if err := model.ValidateUsername(in.Username); err != nil {
+	if err := ValidateUsername(in.Username); err != nil {
 		return nil, err
 	}
-	if err := model.ValidateEmail(in.Email); err != nil {
+	if err := ValidateEmail(in.Email); err != nil {
 		return nil, err
 	}
-	if err := model.ValidatePassword(in.Password); err != nil {
+	if err := ValidatePassword(in.Password); err != nil {
 		return nil, err
 	}
 	exists, err := emailOrUsernameExists(ctx, d.Repo, in.Email, in.Username)
@@ -55,8 +55,8 @@ func RegisterUser(ctx context.Context, d AuthDeps, in RegisterUserInput) (*Regis
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		return tx.Users().Create(ctx, user)
+	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		return d.Repo.User.Create(ctx, user)
 	}); err != nil {
 		return nil, err
 	}

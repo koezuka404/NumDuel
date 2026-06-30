@@ -1,4 +1,3 @@
-// primary → backup への差分同期Worker から定期実行する想定
 package repository
 
 import (
@@ -12,11 +11,11 @@ import (
 )
 
 type BackupSyncer struct {
-	primary *DB
-	backup  *DB
+	primary *gorm.DB
+	backup  *gorm.DB
 }
 
-func NewBackupSyncer(primary, backup *DB) *BackupSyncer {
+func NewBackupSyncer(primary, backup *gorm.DB) *BackupSyncer {
 	return &BackupSyncer{primary: primary, backup: backup}
 }
 
@@ -32,25 +31,25 @@ func (s *BackupSyncer) Sync(ctx context.Context, lastSyncedAt *time.Time) (SyncR
 		run  func(context.Context, *time.Time) (int, time.Time, error)
 	}{
 		{"users", func(ctx context.Context, since *time.Time) (int, time.Time, error) {
-			return syncRows(ctx, s.primary.Gorm(), s.backup.Gorm(), since, model.User{}, "id", func(m model.User) time.Time { return m.UpdatedAt })
+			return syncRows(ctx, s.primary, s.backup, since, model.User{}, "id", func(m model.User) time.Time { return m.UpdatedAt })
 		}},
 		{"games", func(ctx context.Context, since *time.Time) (int, time.Time, error) {
-			return syncRows(ctx, s.primary.Gorm(), s.backup.Gorm(), since, model.Game{}, "id", func(m model.Game) time.Time { return m.UpdatedAt })
+			return syncRows(ctx, s.primary, s.backup, since, model.Game{}, "id", func(m model.Game) time.Time { return m.UpdatedAt })
 		}},
 		{"guesses", func(ctx context.Context, since *time.Time) (int, time.Time, error) {
-			return syncRows(ctx, s.primary.Gorm(), s.backup.Gorm(), since, model.Guess{}, "id", func(m model.Guess) time.Time { return m.UpdatedAt })
+			return syncRows(ctx, s.primary, s.backup, since, model.Guess{}, "id", func(m model.Guess) time.Time { return m.UpdatedAt })
 		}},
 		{"match_histories", func(ctx context.Context, since *time.Time) (int, time.Time, error) {
-			return syncRows(ctx, s.primary.Gorm(), s.backup.Gorm(), since, model.MatchHistory{}, "id", func(m model.MatchHistory) time.Time { return m.UpdatedAt })
+			return syncRows(ctx, s.primary, s.backup, since, model.MatchHistory{}, "id", func(m model.MatchHistory) time.Time { return m.UpdatedAt })
 		}},
 		{"rankings", func(ctx context.Context, since *time.Time) (int, time.Time, error) {
-			return syncRows(ctx, s.primary.Gorm(), s.backup.Gorm(), since, model.Ranking{}, "user_id", func(m model.Ranking) time.Time { return m.UpdatedAt })
+			return syncRows(ctx, s.primary, s.backup, since, model.Ranking{}, "user_id", func(m model.Ranking) time.Time { return m.UpdatedAt })
 		}},
 		{"activity_logs", func(ctx context.Context, since *time.Time) (int, time.Time, error) {
-			return syncRows(ctx, s.primary.Gorm(), s.backup.Gorm(), since, model.ActivityLog{}, "id", func(m model.ActivityLog) time.Time { return m.UpdatedAt })
+			return syncRows(ctx, s.primary, s.backup, since, model.ActivityLog{}, "id", func(m model.ActivityLog) time.Time { return m.UpdatedAt })
 		}},
 		{"login_logs", func(ctx context.Context, since *time.Time) (int, time.Time, error) {
-			return syncRows(ctx, s.primary.Gorm(), s.backup.Gorm(), since, model.LoginLog{}, "id", func(m model.LoginLog) time.Time { return m.UpdatedAt })
+			return syncRows(ctx, s.primary, s.backup, since, model.LoginLog{}, "id", func(m model.LoginLog) time.Time { return m.UpdatedAt })
 		}},
 	}
 	for _, task := range tasks {

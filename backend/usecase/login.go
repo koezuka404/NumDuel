@@ -24,10 +24,10 @@ type LoginOutput struct {
 
 // Login は認証し、JWT と refresh_token（DB にはハッシュのみ保存）を発行する
 func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error) {
-	if err := model.ValidateLoginEmail(in.Email); err != nil {
+	if err := ValidateLoginEmail(in.Email); err != nil {
 		return nil, err
 	}
-	if err := model.ValidatePassword(in.Password); err != nil {
+	if err := ValidatePassword(in.Password); err != nil {
 		return nil, err
 	}
 	user, err := findUserByEmailActive(ctx, d.Repo, in.Email)
@@ -48,18 +48,18 @@ func Login(ctx context.Context, d AuthDeps, in LoginInput) (*LoginOutput, error)
 	}
 	// family_id は新規 UUID同一ログインセッション内のローテーションで共有
 	token := model.NewRefreshToken(user.ID, refreshPair.Hash, uuid.New(), now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
-	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		if err := tx.LoginLogs().Create(ctx, &model.LoginLog{
+	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		if err := d.Repo.LoginLog.Create(ctx, &model.LoginLog{
 			ID: uuid.New(), UserID: user.ID, Action: model.LoginActionLogin, CreatedAt: now, UpdatedAt: now,
 		}); err != nil {
 			return model.ErrInternal("failed to create login log")
 		}
 		user.LastActivityAt = now
 		user.UpdatedAt = now
-		if err := tx.Users().Update(ctx, user); err != nil {
+		if err := d.Repo.User.Update(ctx, user); err != nil {
 			return model.ErrInternal("failed to update user activity")
 		}
-		if err := tx.RefreshTokens().Create(ctx, &token); err != nil {
+		if err := d.Repo.RefreshToken.Create(ctx, &token); err != nil {
 			return model.ErrInternal("failed to store refresh token")
 		}
 		return nil

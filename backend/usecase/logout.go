@@ -30,23 +30,23 @@ func Logout(ctx context.Context, d AuthDeps, in LogoutInput) error {
 	if d.WSSessions != nil {
 		_ = d.WSSessions.DeleteUser(ctx, in.UserID)
 	}
-	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		if err := revokeRefreshTokensByUserID(ctx, tx, in.UserID, now); err != nil {
+	return repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		if err := revokeRefreshTokensByUserID(ctx, d.Repo, in.UserID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}
-		if err := tx.LoginLogs().Create(ctx, &model.LoginLog{
+		if err := d.Repo.LoginLog.Create(ctx, &model.LoginLog{
 			ID: uuid.New(), UserID: in.UserID, Action: model.LoginActionLogout, CreatedAt: now, UpdatedAt: now,
 		}); err != nil {
 			return model.ErrInternal("failed to create login log")
 		}
-		user, err := tx.Users().FindByID(ctx, in.UserID)
+		user, err := d.Repo.User.FindByID(ctx, in.UserID)
 		if err != nil {
 			return model.ErrInternal("failed to find user")
 		}
 		if user != nil {
 			user.LastActivityAt = now
 			user.UpdatedAt = now
-			if err := tx.Users().Update(ctx, user); err != nil {
+			if err := d.Repo.User.Update(ctx, user); err != nil {
 				return model.ErrInternal("failed to update user activity")
 			}
 		}

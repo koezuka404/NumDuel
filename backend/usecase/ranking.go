@@ -9,8 +9,7 @@ import (
 )
 
 type RankingDeps struct {
-	Repo repository.IRepository
-	Tx   repository.ITxManager
+	Repo repository.Repos
 	Now  func() time.Time
 }
 
@@ -29,7 +28,7 @@ type RankingItem struct {
 
 // GetRanking は上位 3 名を返す
 func GetRanking(ctx context.Context, d RankingDeps) ([]RankingItem, error) {
-	rows, err := d.Repo.Rankings().ListAll(ctx)
+	rows, err := d.Repo.Ranking.ListAll(ctx)
 	if err != nil {
 		return nil, model.ErrInternal("failed to load rankings")
 	}
@@ -52,10 +51,12 @@ func RebuildRanking(ctx context.Context, d RankingDeps) error {
 	now := d.now()
 	rankings := make([]model.Ranking, len(rows))
 	for i, row := range rows {
-		rankings[i] = model.NewRanking(row.UserID, i+1, row.Username, row.WinCount, now)
+		rankings[i] = model.Ranking{
+			UserID: row.UserID, Rank: i + 1, Username: row.Username, WinCount: row.WinCount, UpdatedAt: now,
+		}
 	}
-	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		if err := tx.Rankings().ReplaceAll(ctx, rankings); err != nil {
+	return repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		if err := d.Repo.Ranking.ReplaceAll(ctx, rankings); err != nil {
 			return model.ErrInternal("failed to replace rankings")
 		}
 		return nil

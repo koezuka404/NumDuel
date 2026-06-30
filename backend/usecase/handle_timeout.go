@@ -63,7 +63,7 @@ func HandleTimeout(ctx context.Context, d GameDeps, gameID, playerID uuid.UUID) 
 }
 
 func validateTimeoutGame(ctx context.Context, d GameDeps, gameID, playerID uuid.UUID, redisTurn int) error {
-	game, err := d.Repo.Games().FindByID(ctx, gameID)
+	game, err := d.Repo.Game.FindByID(ctx, gameID)
 	if err != nil {
 		return model.ErrInternal("failed to find game")
 	}

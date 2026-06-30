@@ -24,7 +24,7 @@ func RefreshToken(ctx context.Context, d AuthDeps, in RefreshTokenInput) (*Refre
 	now := d.now()
 	hash := d.RefreshTokens.Hash(in.RefreshToken)
 
-	stored, err := d.Repo.RefreshTokens().FindByTokenHash(ctx, hash)
+	stored, err := d.Repo.RefreshToken.FindByTokenHash(ctx, hash)
 	if err != nil {
 		return nil, model.ErrInternal("failed to find refresh token")
 	}
@@ -32,8 +32,8 @@ func RefreshToken(ctx context.Context, d AuthDeps, in RefreshTokenInput) (*Refre
 		return nil, model.ErrUnauthorized()
 	}
 	if stored.Status == model.RefreshTokenRevoked {
-		if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-			return revokeRefreshTokenFamily(ctx, tx, stored.FamilyID, now)
+		if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+			return revokeRefreshTokenFamily(ctx, d.Repo, stored.FamilyID, now)
 		}); err != nil {
 			return nil, err
 		}
@@ -43,27 +43,27 @@ func RefreshToken(ctx context.Context, d AuthDeps, in RefreshTokenInput) (*Refre
 		return nil, model.ErrUnauthorized()
 	}
 	if !stored.IsActive(now) {
-		if err := d.Repo.RefreshTokens().Revoke(ctx, stored.ID, now); err != nil {
+		if err := d.Repo.RefreshToken.Revoke(ctx, stored.ID, now); err != nil {
 			return nil, model.ErrInternal("failed to revoke expired refresh token")
 		}
 		return nil, model.ErrUnauthorized()
 	}
 
 	var accessToken, refreshPlain string
-	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		locked, err := tx.RefreshTokens().FindByTokenHashWithUserForUpdate(ctx, hash)
+	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		locked, err := d.Repo.RefreshToken.FindByTokenHashForUpdate(ctx, hash)
 		if err != nil {
 			return model.ErrInternal("failed to lock refresh token")
 		}
 		if locked == nil || !locked.IsActive(now) {
 			return model.ErrUnauthorized()
 		}
-		user, err := tx.Users().FindByID(ctx, locked.UserID)
+		user, err := d.Repo.User.FindByID(ctx, locked.UserID)
 		if err != nil {
 			return model.ErrInternal("failed to find user")
 		}
 		if user == nil || user.IsDeleted() {
-			_ = tx.RefreshTokens().Revoke(ctx, locked.ID, now)
+			_ = d.Repo.RefreshToken.Revoke(ctx, locked.ID, now)
 			return model.ErrUnauthorized()
 		}
 
@@ -76,15 +76,15 @@ func RefreshToken(ctx context.Context, d AuthDeps, in RefreshTokenInput) (*Refre
 			return model.ErrInternal("failed to generate refresh token")
 		}
 		newToken := model.NewRefreshToken(user.ID, refreshPair.Hash, locked.FamilyID, now.AddDate(0, 0, d.RefreshTokenExpiryDays), now)
-		if err := tx.RefreshTokens().Create(ctx, &newToken); err != nil {
+		if err := d.Repo.RefreshToken.Create(ctx, &newToken); err != nil {
 			return model.ErrInternal("failed to store refresh token")
 		}
-		if err := tx.RefreshTokens().MarkUsed(ctx, locked.ID, now, newToken.ID); err != nil {
+		if err := d.Repo.RefreshToken.MarkUsed(ctx, locked.ID, now, newToken.ID); err != nil {
 			return model.ErrInternal("failed to rotate refresh token")
 		}
 		user.LastActivityAt = now
 		user.UpdatedAt = now
-		if err := tx.Users().Update(ctx, user); err != nil {
+		if err := d.Repo.User.Update(ctx, user); err != nil {
 			return model.ErrInternal("failed to update user activity")
 		}
 		refreshPlain = refreshPair.Plaintext

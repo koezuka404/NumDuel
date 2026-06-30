@@ -13,7 +13,7 @@ import (
 func RecoverActiveGames(ctx context.Context, d GameDeps) error {
 	now := d.now()
 
-	inProgress, err := d.Repo.Games().ListByStatus(ctx, model.GameStatusInProgress)
+	inProgress, err := d.Repo.Game.ListByStatus(ctx, model.GameStatusInProgress)
 	if err != nil {
 		return model.ErrInternal("failed to list in progress games")
 	}
@@ -27,7 +27,7 @@ func RecoverActiveGames(ctx context.Context, d GameDeps) error {
 	}
 
 	before := now.Add(-d.SecretSetup)
-	waitingExpired, err := d.Repo.Games().ListByStatusCreatedBefore(ctx, model.GameStatusWaitingSecret, before)
+	waitingExpired, err := d.Repo.Game.ListByStatusCreatedBefore(ctx, model.GameStatusWaitingSecret, before)
 	if err != nil {
 		return model.ErrInternal("failed to list expired waiting games")
 	}

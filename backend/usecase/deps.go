@@ -10,8 +10,7 @@ import (
 
 // AuthDeps は認証 UseCase が使う依存関係の集合
 type AuthDeps struct {
-	Repo                   repository.IRepository
-	Tx                     repository.ITxManager
+	Repo                   repository.Repos
 	Passwords              model.IPasswordHasher
 	AccessTokens           model.IAccessTokenIssuer
 	RefreshTokens          model.IRefreshTokenGenerator

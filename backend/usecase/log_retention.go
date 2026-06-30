@@ -15,7 +15,7 @@ const (
 
 // LogRetentionDeps は LogRetentionWorker / RunLogRetention の依存
 type LogRetentionDeps struct {
-	Repo                     repository.IRepository
+	Repo                     repository.Repos
 	ActivityLogRetentionDays int
 	LoginLogRetentionDays    int
 	WSLogRetentionDays       int
@@ -50,21 +50,21 @@ func RunLogRetention(ctx context.Context, d LogRetentionDeps) {
 		before := now.AddDate(0, 0, -d.ActivityLogRetentionDays)
 		tasks = append(tasks, task{
 			name: "activity_logs", before: before,
-			delete: d.Repo.ActivityLogs().DeleteOlderThan,
+			delete: d.Repo.ActivityLog.DeleteOlderThan,
 		})
 	}
 	if d.LoginLogRetentionDays > 0 {
 		before := now.AddDate(0, 0, -d.LoginLogRetentionDays)
 		tasks = append(tasks, task{
 			name: "login_logs", before: before,
-			delete: d.Repo.LoginLogs().DeleteOlderThan,
+			delete: d.Repo.LoginLog.DeleteOlderThan,
 		})
 	}
 	if d.WSLogRetentionDays > 0 {
 		before := now.AddDate(0, 0, -d.WSLogRetentionDays)
 		tasks = append(tasks, task{
 			name: "ws_connection_logs", before: before,
-			delete: d.Repo.WSConnectionLogs().DeleteOlderThan,
+			delete: d.Repo.WSConnectionLog.DeleteOlderThan,
 		})
 	}
 

@@ -12,7 +12,7 @@ import (
 func RecordWSConnection(ctx context.Context, d WSAuthDeps, userID uuid.UUID, connectionID string) (uuid.UUID, error) {
 	now := d.now()
 	id := uuid.New()
-	if err := d.Repo.WSConnectionLogs().Create(ctx, &model.WSConnectionLog{
+	if err := d.Repo.WSConnectionLog.Create(ctx, &model.WSConnectionLog{
 		ID: id, UserID: userID, ConnectionID: connectionID, ConnectedAt: now,
 	}); err != nil {
 		return uuid.Nil, model.ErrInternal("failed to record ws connection")
@@ -25,7 +25,7 @@ func TouchWSActivity(ctx context.Context, d WSAuthDeps, userID uuid.UUID) {
 	if d.Repo == nil {
 		return
 	}
-	_ = d.Repo.Users().TouchLastActivity(ctx, userID, d.now())
+	_ = d.Repo.User.TouchLastActivity(ctx, userID, d.now())
 }
 
 // CloseWSConnectionLog は切断時に ws_connection_logs.disconnected_at を更新する
@@ -33,7 +33,7 @@ func CloseWSConnectionLog(ctx context.Context, d WSAuthDeps, logID uuid.UUID) {
 	if d.Repo == nil || logID == uuid.Nil {
 		return
 	}
-	_ = d.Repo.WSConnectionLogs().UpdateDisconnected(ctx, logID, d.now())
+	_ = d.Repo.WSConnectionLog.UpdateDisconnected(ctx, logID, d.now())
 }
 
 // NotifyOpponentDisconnected は対戦中ゲームの相手へ切断を通知する

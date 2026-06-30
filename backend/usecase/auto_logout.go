@@ -13,8 +13,7 @@ import (
 // AutoLogoutDeps は AutoLogoutUseCase の依存関係
 // SESSION_TIMEOUT_MINUTES 分間 last_activity_at が更新されていないユーザーを対象にする
 type AutoLogoutDeps struct {
-	Repo            repository.IRepository
-	Tx              repository.ITxManager
+	Repo            repository.Repos
 	ForceLogout     model.IForceLogoutStore // Redis user:{userId}:force_logout_before
 	ForceDisconnect func(ctx context.Context, userID uuid.UUID) error // WS ERROR 送信後に切断
 	SessionTimeout  time.Duration
@@ -36,7 +35,7 @@ func AutoLogout(ctx context.Context, d AutoLogoutDeps) error {
 	}
 	now := d.now()
 	before := now.Add(-d.SessionTimeout)
-	users, err := d.Repo.Users().ListInactiveSince(ctx, before)
+	users, err := d.Repo.User.ListInactiveSince(ctx, before)
 	if err != nil {
 		return model.ErrInternal("failed to list inactive users")
 	}
@@ -62,24 +61,24 @@ func autoLogoutUser(ctx context.Context, d AutoLogoutDeps, userID uuid.UUID, now
 	if d.ForceDisconnect != nil {
 		_ = d.ForceDisconnect(ctx, userID)
 	}
-	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		if err := revokeRefreshTokensByUserID(ctx, tx, userID, now); err != nil {
+	return repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		if err := revokeRefreshTokensByUserID(ctx, d.Repo, userID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}
-		if err := tx.LoginLogs().Create(ctx, &model.LoginLog{
+		if err := d.Repo.LoginLog.Create(ctx, &model.LoginLog{
 			ID: uuid.New(), UserID: userID, Action: model.LoginActionAutoLogout,
 			CreatedAt: now, UpdatedAt: now,
 		}); err != nil {
 			return model.ErrInternal("failed to create login log")
 		}
-		user, err := tx.Users().FindByID(ctx, userID)
+		user, err := d.Repo.User.FindByID(ctx, userID)
 		if err != nil {
 			return model.ErrInternal("failed to find user")
 		}
 		if user != nil && !user.IsDeleted() {
 			user.LastActivityAt = now
 			user.UpdatedAt = now
-			if err := tx.Users().Update(ctx, user); err != nil {
+			if err := d.Repo.User.Update(ctx, user); err != nil {
 				return model.ErrInternal("failed to update user")
 			}
 		}

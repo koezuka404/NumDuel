@@ -12,7 +12,7 @@ import (
 )
 
 type WSAuthDeps struct {
-	Repo        repository.IRepository
+	Repo        repository.Repos
 	JWT         *infrcrypto.JWTService
 	Revoker     model.IJWTRevoker
 	ForceLogout model.IForceLogoutStore
@@ -58,7 +58,7 @@ func AuthenticateWebSocket(ctx context.Context, d WSAuthDeps, token string) (*WS
 			return nil, model.ErrUnauthorized()
 		}
 	}
-	user, err := d.Repo.Users().FindByID(ctx, parsed.UserID)
+	user, err := d.Repo.User.FindByID(ctx, parsed.UserID)
 	if err != nil {
 		return nil, model.ErrInternal("failed to find user")
 	}

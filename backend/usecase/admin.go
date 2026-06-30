@@ -14,8 +14,7 @@ import (
 )
 
 type AdminDeps struct {
-	Repo          repository.IRepository
-	Tx            repository.ITxManager
+	Repo          repository.Repos
 	WSSessions    model.IWSSessionStore
 	ForceLogout   model.IForceLogoutStore
 	BackupStatus  model.IBackupStatusStore
@@ -42,7 +41,7 @@ type AdminUserItem struct {
 }
 
 func GetAdminUsers(ctx context.Context, d AdminDeps, page, limit int) ([]AdminUserItem, int64, error) {
-	users, total, err := d.Repo.Users().List(ctx, page, limit)
+	users, total, err := d.Repo.User.List(ctx, page, limit)
 	if err != nil {
 		return nil, 0, model.ErrInternal("failed to list users")
 	}
@@ -53,7 +52,7 @@ func SearchAdminUsers(ctx context.Context, d AdminDeps, query string) ([]AdminUs
 	if query == "" {
 		return nil, model.ErrValidation("query is required")
 	}
-	users, _, err := d.Repo.Users().Search(ctx, query, 1, 100)
+	users, _, err := d.Repo.User.Search(ctx, query, 1, 100)
 	if err != nil {
 		return nil, model.ErrInternal("failed to search users")
 	}
@@ -69,7 +68,7 @@ func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) e
 	if adminID == targetID {
 		return model.ErrCannotDeleteSelf()
 	}
-	target, err := d.Repo.Users().FindByID(ctx, targetID)
+	target, err := d.Repo.User.FindByID(ctx, targetID)
 	if err != nil {
 		return model.ErrInternal("failed to find user")
 	}
@@ -98,17 +97,17 @@ func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) e
 	if d.WSSessions != nil {
 		_ = d.WSSessions.DeleteUser(ctx, targetID)
 	}
-	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
-		if err := revokeRefreshTokensByUserID(ctx, tx, targetID, now); err != nil {
+	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
+		if err := revokeRefreshTokensByUserID(ctx, d.Repo, targetID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}
-		if err := tx.MatchingQueue().DeleteByUserID(ctx, targetID); err != nil {
+		if err := d.Repo.MatchingQueue.DeleteByUserID(ctx, targetID); err != nil {
 			return model.ErrInternal("failed to remove matching queue")
 		}
 		target.DeletedAt = &now
 		target.DeletedBy = &adminID
 		target.UpdatedAt = now
-		if err := tx.Users().Update(ctx, target); err != nil {
+		if err := d.Repo.User.Update(ctx, target); err != nil {
 			return model.ErrInternal("failed to delete user")
 		}
 		return nil
@@ -127,7 +126,7 @@ type ActivityLogItem struct {
 }
 
 func SearchActivityLogs(ctx context.Context, d AdminDeps, logType string, userID *uuid.UUID, from, to *time.Time, page, limit int) ([]ActivityLogItem, int64, error) {
-	rows, total, err := d.Repo.ActivityLogs().Search(ctx, logType, userID, from, to, page, limit)
+	rows, total, err := d.Repo.ActivityLog.Search(ctx, logType, userID, from, to, page, limit)
 	if err != nil {
 		return nil, 0, model.ErrInternal("failed to search activity logs")
 	}
@@ -142,7 +141,7 @@ func SearchActivityLogs(ctx context.Context, d AdminDeps, logType string, userID
 }
 
 func ListActivityLogTypes(ctx context.Context, d AdminDeps) ([]string, error) {
-	types, err := d.Repo.ActivityLogs().ListDistinctLogTypes(ctx)
+	types, err := d.Repo.ActivityLog.ListDistinctLogTypes(ctx)
 	if err != nil {
 		return nil, model.ErrInternal("failed to list log types")
 	}
@@ -153,7 +152,7 @@ func DownloadActivityLogsCSV(ctx context.Context, d AdminDeps, adminID uuid.UUID
 	if err := acquireAdminLock(ctx, d, adminLogDownloadLockKey(adminID)); err != nil {
 		return nil, err
 	}
-	rows, _, err := d.Repo.ActivityLogs().Search(ctx, logType, userID, from, to, 1, 10000)
+	rows, _, err := d.Repo.ActivityLog.Search(ctx, logType, userID, from, to, 1, 10000)
 	if err != nil {
 		return nil, model.ErrInternal("failed to search activity logs")
 	}
@@ -184,7 +183,7 @@ func RebuildRankingAsAdmin(ctx context.Context, d AdminDeps, adminID uuid.UUID) 
 	if err := acquireAdminLock(ctx, d, adminRankingRebuildLockKey(adminID)); err != nil {
 		return err
 	}
-	if err := RebuildRanking(ctx, RankingDeps{Repo: d.Repo, Tx: d.Tx, Now: d.Now}); err != nil {
+	if err := RebuildRanking(ctx, RankingDeps{Repo: d.Repo, Now: d.Now}); err != nil {
 		return err
 	}
 	return recordAdminRebuildRankingLog(ctx, d.Repo, adminID, d.now())
