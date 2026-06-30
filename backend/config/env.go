@@ -19,7 +19,8 @@ type Config struct {
 	CookieSecure           bool
 	GameSecretPepper       string
 	GameLockSeconds        int
-	TurnDurationSeconds    int
+	TurnDurationSeconds       int
+	TurnTimeoutPollSeconds    int
 	WSAllowedOrigins       []string
 }
 
@@ -41,6 +42,7 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		GameSecretPepper:       getenv("GAME_SECRET_PEPPER"),
 		GameLockSeconds:        envInt(getenv, "GAME_LOCK_SECONDS", 2),
 		TurnDurationSeconds:    envInt(getenv, "TURN_DURATION_SECONDS", 30),
+		TurnTimeoutPollSeconds: envInt(getenv, "TURN_TIMEOUT_POLL_SECONDS", 1),
 	}
 	if raw := getenv("WS_ALLOWED_ORIGINS"); raw != "" {
 		for _, o := range strings.Split(raw, ",") {
@@ -79,6 +81,10 @@ func (c *Config) GameLockTTL() time.Duration {
 
 func (c *Config) TurnDuration() time.Duration {
 	return time.Duration(c.TurnDurationSeconds) * time.Second
+}
+
+func (c *Config) TurnTimeoutPollInterval() time.Duration {
+	return time.Duration(c.TurnTimeoutPollSeconds) * time.Second
 }
 
 func envInt(getenv func(string) string, key string, fallback int) int {

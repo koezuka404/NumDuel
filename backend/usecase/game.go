@@ -18,6 +18,7 @@ type GameDeps struct {
 	Secrets      model.SecretHasher
 	Locks        model.GameLockStore
 	Turns        model.TurnStore
+	Random       model.GuessNumberGenerator
 	Notifier     model.EventNotifier
 	TurnDuration time.Duration
 	GameLockTTL  time.Duration

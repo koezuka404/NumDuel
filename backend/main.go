@@ -18,10 +18,12 @@ import (
 	"github.com/numduel/numduel/db"
 	infrcrypto "github.com/numduel/numduel/crypto"
 	"github.com/numduel/numduel/middleware"
+	infrredis "github.com/numduel/numduel/redis"
 	"github.com/numduel/numduel/repository"
 	"github.com/numduel/numduel/router"
 	"github.com/numduel/numduel/usecase"
 	infrws "github.com/numduel/numduel/websocket"
+	"github.com/numduel/numduel/worker"
 )
 
 func main() {
@@ -52,8 +54,14 @@ func main() {
 		log.Fatalf("secret hasher: %v", err)
 	}
 
+	rdb := db.OpenRedis()
+	if rdb != nil {
+		defer rdb.Close()
+	}
+	redisStore := infrredis.NewStore(rdb)
+
 	hub := infrws.NewHub()
-	sessionStore := infrws.NewSessionStore(hub, nil)
+	sessionStore := infrws.NewSessionStore(hub, redisStore)
 
 	authDeps := usecase.AuthDeps{
 		Repo:                   dbSetup.Repo,
@@ -61,24 +69,24 @@ func main() {
 		Passwords:              infrcrypto.NewPasswordService(),
 		AccessTokens:           jwtService,
 		RefreshTokens:          infrcrypto.NewRefreshTokenService(),
-		JWTRevoker:             nil,
+		JWTRevoker:             redisStore,
 		WSSessions:             sessionStore,
 		RefreshTokenExpiryDays: cfg.RefreshTokenExpiryDays,
 	}
 	gameDeps := usecase.GameDeps{
 		Repo: dbSetup.Repo, Tx: dbSetup.Tx, Secrets: secretHasher,
-		Locks: nil, Turns: nil, Notifier: hub,
+		Locks: redisStore, Turns: redisStore, Random: infrcrypto.NewRandomNumberService(), Notifier: hub,
 		TurnDuration: cfg.TurnDuration(), GameLockTTL: cfg.GameLockTTL(),
 	}
 	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx, Notifier: hub}
 	profileDeps := usecase.ProfileDeps{Repo: dbSetup.Repo}
 	rankingDeps := usecase.RankingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx}
 	adminDeps := usecase.AdminDeps{
-		Repo: dbSetup.Repo, Tx: dbSetup.Tx, WSSessions: sessionStore, BackupStatus: nil,
+		Repo: dbSetup.Repo, Tx: dbSetup.Tx, WSSessions: sessionStore, BackupStatus: redisStore,
 	}
 	wsAuthDeps := usecase.WSAuthDeps{
 		Repo: dbSetup.Repo, JWT: jwtService,
-		Revoker: nil, ForceLogout: nil, Notifier: hub,
+		Revoker: redisStore, ForceLogout: redisStore, Notifier: hub,
 	}
 
 	allowed := make(map[string]struct{}, len(cfg.WSAllowedOrigins))
@@ -87,7 +95,7 @@ func main() {
 	}
 	wsHandler := &infrws.Handler{
 		Hub: hub, WSAuth: wsAuthDeps, Game: gameDeps,
-		Allowed: allowed, Redis: nil,
+		Allowed: allowed, Redis: redisStore,
 		JWTMin: cfg.JWTExpiryMinutes, Repo: dbSetup.Repo,
 	}
 
@@ -108,11 +116,21 @@ func main() {
 		Ranking: rankingDeps, Admin: adminDeps,
 		WSAuth: wsAuthDeps, WS: wsHandler, JWT: jwtService,
 		AuthMW: middleware.AuthConfig{
-			JWT: jwtService, Revoker: nil,
-			ForceLogout: nil, Repo: dbSetup.Repo,
+			JWT: jwtService, Revoker: redisStore,
+			ForceLogout: redisStore, Repo: dbSetup.Repo,
 		},
 		Cfg: cfg,
 	})
+
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	if redisStore != nil && cfg.TurnTimeoutPollSeconds > 0 {
+		go (&worker.TurnTimeoutWorker{
+			Store:    redisStore,
+			Game:     gameDeps,
+			Interval: cfg.TurnTimeoutPollInterval(),
+		}).Run(workerCtx)
+	}
 
 	go func() {
 		addr := ":" + strconv.Itoa(cfg.Port)

@@ -48,9 +48,23 @@ type GameLockStore interface {
 	AcquireLock(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
+// TurnInfo は Redis game:{gameId}:turn の内容。
+type TurnInfo struct {
+	Turn      int
+	PlayerID  uuid.UUID
+	StartedAt time.Time
+	ExpiresAt time.Time
+}
+
+// GuessNumberGenerator はタイムアウト自動予想の 4 桁生成。
+type GuessNumberGenerator interface {
+	GenerateGuessNumber() (GuessNumber, error)
+}
+
 // TurnStore はターン期限（game:{gameId}:turn）の管理。
 type TurnStore interface {
 	SetTurn(ctx context.Context, gameID uuid.UUID, turn int, playerID uuid.UUID, startedAt, expiresAt time.Time) error
+	GetTurn(ctx context.Context, gameID uuid.UUID) (*TurnInfo, error)
 	RemainingSeconds(ctx context.Context, gameID uuid.UUID, now time.Time) (int, error)
 	DeleteTurn(ctx context.Context, gameID uuid.UUID) error
 }
