@@ -10,13 +10,14 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/usecase"
 )
 
 type SecretHashService struct {
 	pepper []byte
 }
 
-var _ model.ISecretHasher = (*SecretHashService)(nil)
+var _ usecase.ISecretHasher = (*SecretHashService)(nil)
 
 func NewSecretHashService(pepper string) (*SecretHashService, error) {
 	if len(pepper) < 32 {
@@ -33,15 +34,14 @@ func (s *SecretHashService) Hash(digits [4]int, gameID uuid.UUID, playerSlot int
 	return strings.Join(parts, ":"), nil
 }
 
-func (s *SecretHashService) Verify(storedHash string, guess model.GuessNumber, gameID uuid.UUID, opponentSlot int) ([4]model.DigitResult, error) {
+func (s *SecretHashService) Verify(storedHash string, guess [4]int, gameID uuid.UUID, opponentSlot int) ([]model.DigitResult, error) {
 	parts := strings.Split(storedHash, ":")
 	if len(parts) != 4 {
-		return [4]model.DigitResult{}, model.ErrInternal("invalid secret hash format")
+		return nil, fmt.Errorf("invalid secret hash format")
 	}
-	digits := guess.Digits()
-	var results [4]model.DigitResult
+	results := make([]model.DigitResult, 4)
 	for i := 0; i < 4; i++ {
-		expected := s.digest(gameID, opponentSlot, i, digits[i])
+		expected := s.digest(gameID, opponentSlot, i, guess[i])
 		if hmac.Equal([]byte(parts[i]), []byte(expected)) {
 			results[i] = model.DigitHit
 		}

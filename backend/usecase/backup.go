@@ -4,33 +4,62 @@ import (
 	"context"
 	"time"
 
-	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/repository"
 )
 
+type BackupStatus struct {
+	Status       string
+	LastSyncedAt *time.Time
+}
+
+// バックアップ状態の読み取り。
+type IBackupStatusReader interface {
+	GetBackupStatus(ctx context.Context) (*BackupStatus, error)
+}
+
+// バックアップ状態の Redis 管理。
+type IBackupStatusStore interface {
+	IBackupStatusReader
+	SetBackupStatus(ctx context.Context, status string, lastSyncedAt time.Time) error
+}
+
+// DB バックアップ同期ユースケース。
+type IBackupUsecase interface {
+	RunSync(ctx context.Context) error
+}
+
 const defaultBackupMaxRetries = 3
 
-// BackupDeps は BackupWorker / RunBackupSync の依存
-type BackupDeps struct {
+type BackupUseCase struct {
 	Syncer       *repository.BackupSyncer
-	BackupStatus model.IBackupStatusStore
+	BackupStatus IBackupStatusStore
 	MaxRetries   int
 	Now          func() time.Time
 }
 
-// RunBackupSync は primary → backup への差分 UPSERT を実行する（§12.8）
-func RunBackupSync(ctx context.Context, d BackupDeps) error {
-	if d.Syncer == nil {
+func NewBackupUseCase(syncer *repository.BackupSyncer, backup IBackupStatusStore, maxRetries int) *BackupUseCase {
+	return &BackupUseCase{Syncer: syncer, BackupStatus: backup, MaxRetries: maxRetries}
+}
+
+func (b *BackupUseCase) now() time.Time {
+	if b != nil && b.Now != nil {
+		return b.Now().UTC()
+	}
+	return time.Now().UTC()
+}
+
+func (b *BackupUseCase) RunSync(ctx context.Context) error {
+	if b.Syncer == nil {
 		return nil
 	}
-	maxRetries := d.MaxRetries
+	maxRetries := b.MaxRetries
 	if maxRetries <= 0 {
 		maxRetries = defaultBackupMaxRetries
 	}
 
 	var lastSyncedAt *time.Time
-	if d.BackupStatus != nil {
-		st, err := d.BackupStatus.GetBackupStatus(ctx)
+	if b.BackupStatus != nil {
+		st, err := b.BackupStatus.GetBackupStatus(ctx)
 		if err != nil {
 			return err
 		}
@@ -41,27 +70,20 @@ func RunBackupSync(ctx context.Context, d BackupDeps) error {
 
 	var syncErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		if _, syncErr = d.Syncer.Sync(ctx, lastSyncedAt); syncErr == nil {
-			if d.BackupStatus != nil {
-				return d.BackupStatus.SetBackupStatus(ctx, "ok", d.now())
+		if _, syncErr = b.Syncer.Sync(ctx, lastSyncedAt); syncErr == nil {
+			if b.BackupStatus != nil {
+				return b.BackupStatus.SetBackupStatus(ctx, "ok", b.now())
 			}
 			return nil
 		}
 	}
 
-	if d.BackupStatus != nil {
+	if b.BackupStatus != nil {
 		preserved := time.Time{}
-		if st, err := d.BackupStatus.GetBackupStatus(ctx); err == nil && st != nil && st.LastSyncedAt != nil {
+		if st, err := b.BackupStatus.GetBackupStatus(ctx); err == nil && st != nil && st.LastSyncedAt != nil {
 			preserved = *st.LastSyncedAt
 		}
-		_ = d.BackupStatus.SetBackupStatus(ctx, "error", preserved)
+		_ = b.BackupStatus.SetBackupStatus(ctx, "error", preserved)
 	}
 	return syncErr
-}
-
-func (d BackupDeps) now() time.Time {
-	if d.Now != nil {
-		return d.Now().UTC()
-	}
-	return time.Now().UTC()
 }

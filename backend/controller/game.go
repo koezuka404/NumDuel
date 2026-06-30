@@ -1,4 +1,3 @@
-// ゲーム API の HTTP ハンドラ
 package controller
 
 import (
@@ -9,31 +8,29 @@ import (
 
 	"github.com/numduel/numduel/dto"
 	"github.com/numduel/numduel/middleware"
-	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/usecase"
 )
 
 type GameController struct {
-	Deps usecase.GameDeps
+	Game usecase.IGameUsecase
 }
 
-func NewGameController(deps usecase.GameDeps) *GameController {
-	return &GameController{Deps: deps}
+func NewGameController(game usecase.IGameUsecase) *GameController {
+	return &GameController{Game: game}
 }
 
-// Get GET /api/games/:id
 func (h *GameController) Get(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
-		return dto.WriteError(c, model.ErrUnauthorized())
+		return dto.WriteError(c, usecase.ErrUnauthorized)
 	}
 	gameID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		return dto.WriteError(c, model.ErrValidation("invalid game id"))
+		return dto.WriteError(c, usecase.ErrBadRequest)
 	}
-	out, err := usecase.GetGameState(c.Request().Context(), h.Deps, auth.UserID, gameID)
+	out, err := h.Game.GetGameState(c.Request().Context(), auth.UserID, gameID)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.GameStateToMap(out))
+	return dto.WriteData(c, http.StatusOK, gameStateResponse(out))
 }

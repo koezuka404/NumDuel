@@ -10,115 +10,107 @@ import (
 
 	"github.com/numduel/numduel/dto"
 	"github.com/numduel/numduel/middleware"
-	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/usecase"
 )
 
 type AdminController struct {
-	Deps usecase.AdminDeps
+	Admin usecase.IAdminUsecase
 }
 
-func NewAdminController(deps usecase.AdminDeps) *AdminController {
-	return &AdminController{Deps: deps}
+func NewAdminController(admin usecase.IAdminUsecase) *AdminController {
+	return &AdminController{Admin: admin}
 }
 
-// ListUsers GET /api/admin/users
 func (h *AdminController) ListUsers(c echo.Context) error {
 	page, limit := dto.ParsePageLimit(c)
-	items, total, err := usecase.GetAdminUsers(c.Request().Context(), h.Deps, page, limit)
+	items, total, err := h.Admin.ListUsers(c.Request().Context(), page, limit)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WritePaged(c, http.StatusOK, usecase.AdminUsersResponse(items), page, limit, total)
+	return dto.WritePaged(c, http.StatusOK, adminUsersResponse(items), page, limit, total)
 }
 
-// SearchUsers GET /api/admin/users/search
 func (h *AdminController) SearchUsers(c echo.Context) error {
-	items, err := usecase.SearchAdminUsers(c.Request().Context(), h.Deps, c.QueryParam("q"))
+	items, err := h.Admin.SearchUsers(c.Request().Context(), c.QueryParam("q"))
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.AdminUsersResponse(items))
+	return dto.WriteData(c, http.StatusOK, adminUsersResponse(items))
 }
 
-// DeleteUser DELETE /api/admin/users/:id
 func (h *AdminController) DeleteUser(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
-		return dto.WriteError(c, model.ErrUnauthorized())
+		return dto.WriteError(c, usecase.ErrUnauthorized)
 	}
 	targetID, err := parseUUIDParam(c, "id")
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	if err := usecase.DeleteUser(c.Request().Context(), h.Deps, auth.UserID, targetID); err != nil {
+	if err := h.Admin.DeleteUser(c.Request().Context(), auth.UserID, targetID); err != nil {
 		return dto.WriteError(c, err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
-// RebuildRanking POST /api/admin/ranking/rebuild
 func (h *AdminController) RebuildRanking(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
-		return dto.WriteError(c, model.ErrUnauthorized())
+		return dto.WriteError(c, usecase.ErrUnauthorized)
 	}
-	if err := usecase.RebuildRankingAsAdmin(c.Request().Context(), h.Deps, auth.UserID); err != nil {
+	if err := h.Admin.RebuildRanking(c.Request().Context(), auth.UserID); err != nil {
 		return dto.WriteError(c, err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
-// SearchLogs GET /api/admin/logs
 func (h *AdminController) SearchLogs(c echo.Context) error {
-	userID, err := usecase.ParseOptionalUUID(c.QueryParam("userId"))
+	userID, err := parseOptionalUUID(c.QueryParam("userId"))
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	from, err := usecase.ParseOptionalTime(c.QueryParam("from"))
+	from, err := parseOptionalTime(c.QueryParam("from"))
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	to, err := usecase.ParseOptionalTime(c.QueryParam("to"))
+	to, err := parseOptionalTime(c.QueryParam("to"))
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
 	page, limit := dto.ParsePageLimit(c)
-	items, total, err := usecase.SearchActivityLogs(c.Request().Context(), h.Deps, c.QueryParam("logType"), userID, from, to, page, limit)
+	items, total, err := h.Admin.SearchActivityLogs(c.Request().Context(), c.QueryParam("logType"), userID, from, to, page, limit)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WritePaged(c, http.StatusOK, usecase.ActivityLogsResponse(items), page, limit, total)
+	return dto.WritePaged(c, http.StatusOK, activityLogsResponse(items), page, limit, total)
 }
 
-// ListLogTypes GET /api/admin/logs/types
 func (h *AdminController) ListLogTypes(c echo.Context) error {
-	types, err := usecase.ListActivityLogTypes(c.Request().Context(), h.Deps)
+	types, err := h.Admin.ListActivityLogTypes(c.Request().Context())
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.LogTypesResponse(types))
+	return dto.WriteData(c, http.StatusOK, logTypesResponse(types))
 }
 
-// DownloadLogs GET /api/admin/logs/download
 func (h *AdminController) DownloadLogs(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
-		return dto.WriteError(c, model.ErrUnauthorized())
+		return dto.WriteError(c, usecase.ErrUnauthorized)
 	}
-	userID, err := usecase.ParseOptionalUUID(c.QueryParam("userId"))
+	userID, err := parseOptionalUUID(c.QueryParam("userId"))
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	from, err := usecase.ParseOptionalTime(c.QueryParam("from"))
+	from, err := parseOptionalTime(c.QueryParam("from"))
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	to, err := usecase.ParseOptionalTime(c.QueryParam("to"))
+	to, err := parseOptionalTime(c.QueryParam("to"))
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	csvData, err := usecase.DownloadActivityLogsCSV(c.Request().Context(), h.Deps, auth.UserID, c.QueryParam("logType"), userID, from, to)
+	csvData, err := h.Admin.DownloadActivityLogsCSV(c.Request().Context(), auth.UserID, c.QueryParam("logType"), userID, from, to)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
@@ -128,19 +120,40 @@ func (h *AdminController) DownloadLogs(c echo.Context) error {
 	return c.Blob(http.StatusOK, "text/csv", csvData)
 }
 
-// BackupStatus GET /api/admin/backup/status
 func (h *AdminController) BackupStatus(c echo.Context) error {
-	out, err := usecase.GetBackupStatus(c.Request().Context(), h.Deps)
+	out, err := h.Admin.GetBackupStatus(c.Request().Context())
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.BackupStatusResponse(out))
+	return dto.WriteData(c, http.StatusOK, backupStatusResponse(out))
 }
 
 func parseUUIDParam(c echo.Context, name string) (uuid.UUID, error) {
 	id, err := uuid.Parse(c.Param(name))
 	if err != nil {
-		return uuid.Nil, model.ErrValidation("invalid id")
+		return uuid.Nil, usecase.ErrBadRequest
 	}
 	return id, nil
+}
+
+func parseOptionalUUID(raw string) (*uuid.UUID, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return nil, usecase.ErrBadRequest
+	}
+	return &id, nil
+}
+
+func parseOptionalTime(raw string) (*time.Time, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return nil, usecase.ErrBadRequest
+	}
+	return &t, nil
 }

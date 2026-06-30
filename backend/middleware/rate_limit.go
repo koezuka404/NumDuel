@@ -8,7 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/numduel/numduel/dto"
-	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/usecase"
 )
 
 type rateLimiter struct {
@@ -64,7 +64,7 @@ func RateLimit() echo.MiddlewareFunc {
 			limit, window := rateLimitForPath(c.Path())
 			key := c.RealIP() + ":" + c.Path()
 			if !apiRateLimiter.allow(key, limit, window) {
-				return dto.WriteError(c, model.ErrRateLimitExceeded())
+				return dto.WriteError(c, usecase.ErrRateLimitExceeded)
 			}
 			return next(c)
 		}

@@ -11,23 +11,73 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// GameDeps はゲーム系 UseCase の依存関係
-type GameDeps struct {
-	Repo         repository.Repos
-	Secrets      model.ISecretHasher
-	Locks        model.IGameLockStore
-	Turns        model.ITurnStore
-	Random       model.IGuessNumberGenerator
-	Notifier     model.IEventNotifier
+// 対戦ゲームのユースケース。
+type IGameUsecase interface {
+	GetGameState(ctx context.Context, userID, gameID uuid.UUID) (*GameStateOutput, error)
+	SyncGameState(ctx context.Context, userID, gameID uuid.UUID) (*GameStateOutput, error)
+	SetSecretNumber(ctx context.Context, userID, gameID uuid.UUID, secret string) error
+	SubmitGuess(ctx context.Context, userID, gameID uuid.UUID, guess string, isAuto bool) error
+	HandleTimeout(ctx context.Context, gameID, playerID uuid.UUID) error
+	CancelBySecretTimeout(ctx context.Context, gameID uuid.UUID) error
+	RecoverActiveGames(ctx context.Context) error
+}
+
+// 秘密数字の hash 化と照合。
+type ISecretHasher interface {
+	Hash(secret [4]int, gameID uuid.UUID, slot int) (string, error)
+	Verify(storedHash string, guess [4]int, gameID uuid.UUID, slot int) ([]model.DigitResult, error)
+}
+
+// ゲーム操作の分散ロック。
+type IGameLockStore interface {
+	AcquireLock(ctx context.Context, key string, ttl time.Duration) (bool, error)
+}
+
+type TurnInfo struct {
+	Turn      int
+	PlayerID  uuid.UUID
+	ExpiresAt time.Time
+}
+
+// ターンタイマーの Redis 管理。
+type ITurnStore interface {
+	SetTurn(ctx context.Context, gameID uuid.UUID, turn int, playerID uuid.UUID, startedAt, expiresAt time.Time) error
+	GetTurn(ctx context.Context, gameID uuid.UUID) (*TurnInfo, error)
+	RemainingSeconds(ctx context.Context, gameID uuid.UUID, now time.Time) (int, error)
+	DeleteTurn(ctx context.Context, gameID uuid.UUID) error
+}
+
+// 推測数字の乱数生成。
+type IGuessNumberGenerator interface {
+	GenerateGuessNumber() (string, error)
+}
+
+// WebSocket イベント通知。
+type IEventNotifier interface {
+	SendToUser(ctx context.Context, userID uuid.UUID, eventType string, payload map[string]any) error
+}
+
+type GameUseCase struct {
+	Games        repository.IGameRepo
+	Guesses      repository.IGuessRepo
+	Users        repository.IUserRepo
+	MatchHistory repository.IMatchHistoryRepo
+	ActivityLogs repository.IActivityLogRepo
+	Repos        repository.Repos
+	Secrets      ISecretHasher
+	Locks        IGameLockStore
+	Turns        ITurnStore
+	Random       IGuessNumberGenerator
+	Notifier     IEventNotifier
 	TurnDuration time.Duration
 	SecretSetup  time.Duration
 	GameLockTTL  time.Duration
 	Now          func() time.Time
 }
 
-func (d GameDeps) now() time.Time {
-	if d.Now != nil {
-		return d.Now()
+func (g *GameUseCase) now() time.Time {
+	if g != nil && g.Now != nil {
+		return g.Now().UTC()
 	}
 	return time.Now().UTC()
 }
@@ -50,66 +100,65 @@ type GameStateOutput struct {
 	OpponentGuessCount  int
 }
 
-func GameStateToMap(s *GameStateOutput) map[string]any {
-	turnPlayer := s.CurrentTurnPlayerID
+func gameStateWSPayload(s *GameStateOutput) map[string]any {
 	guesses := make([]map[string]any, len(s.MyGuesses))
-	for i, g := range s.MyGuesses {
+	for i, row := range s.MyGuesses {
 		guesses[i] = map[string]any{
-			"turn": g.Turn, "guessNumber": g.GuessNumber,
-			"digitResults": g.DigitResults, "hitCount": g.HitCount, "isAuto": g.IsAuto,
+			"turn": row.Turn, "guessNumber": row.GuessNumber,
+			"digitResults": row.DigitResults, "hitCount": row.HitCount, "isAuto": row.IsAuto,
 		}
 	}
 	return map[string]any{
 		"gameId": s.GameID.String(), "status": string(s.Status),
-		"currentTurn": s.CurrentTurn, "currentTurnPlayerID": turnPlayer,
+		"currentTurn": s.CurrentTurn, "currentTurnPlayerID": s.CurrentTurnPlayerID,
 		"remainingSeconds": s.RemainingSeconds, "myGuesses": guesses,
 		"opponentGuessCount": s.OpponentGuessCount,
 	}
 }
 
-func GetGameState(ctx context.Context, d GameDeps, userID, gameID uuid.UUID) (*GameStateOutput, error) {
-	return buildGameState(ctx, d, userID, gameID)
+func (g *GameUseCase) GetGameState(ctx context.Context, userID, gameID uuid.UUID) (*GameStateOutput, error) {
+	return g.buildGameState(ctx, userID, gameID)
 }
 
-func SyncGameState(ctx context.Context, d GameDeps, userID, gameID uuid.UUID) (*GameStateOutput, error) {
-	state, err := buildGameState(ctx, d, userID, gameID)
+func (g *GameUseCase) SyncGameState(ctx context.Context, userID, gameID uuid.UUID) (*GameStateOutput, error) {
+	state, err := g.buildGameState(ctx, userID, gameID)
 	if err != nil {
 		return nil, err
 	}
-	if d.Notifier != nil {
-		_ = d.Notifier.SendToUser(ctx, userID, "GAME_STATE_SYNC", GameStateToMap(state))
+	if g.Notifier != nil {
+		_ = g.Notifier.SendToUser(ctx, userID, "GAME_STATE_SYNC", gameStateWSPayload(state))
 	}
 	return state, nil
 }
 
-func buildGameState(ctx context.Context, d GameDeps, userID, gameID uuid.UUID) (*GameStateOutput, error) {
-	game, err := d.Repo.Game.FindByID(ctx, gameID)
-	if err != nil {
-		return nil, model.ErrInternal("failed to find game")
-	}
-	if game == nil {
-		return nil, model.ErrNotFound("game not found")
-	}
-	if !game.IsParticipant(userID) {
-		return nil, model.ErrForbidden("not a participant")
-	}
-	myGuesses, err := d.Repo.Guess.ListByGameAndPlayer(ctx, gameID, userID)
-	if err != nil {
-		return nil, model.ErrInternal("failed to load guesses")
-	}
-	opponentID, err := game.OpponentID(userID)
+func (g *GameUseCase) buildGameState(ctx context.Context, userID, gameID uuid.UUID) (*GameStateOutput, error) {
+	game, err := g.Games.FindByID(ctx, gameID)
 	if err != nil {
 		return nil, err
 	}
-	oppCount, err := d.Repo.Guess.CountByGameExcludingPlayer(ctx, gameID, opponentID)
+	if game == nil {
+		return nil, ErrNotFound
+	}
+	if !game.IsParticipant(userID) {
+		return nil, ErrForbidden
+	}
+	myGuesses, err := g.Guesses.ListByGameAndPlayer(ctx, gameID, userID)
 	if err != nil {
-		return nil, model.ErrInternal("failed to count opponent guesses")
+		return nil, err
+	}
+	opponentID, err := gameOpponentID(game, userID)
+	if err != nil {
+		return nil, err
+	}
+	oppCount, err := g.Guesses.CountByGameExcludingPlayer(ctx, gameID, opponentID)
+	if err != nil {
+		return nil, err
 	}
 	remaining := 0
-	if d.Turns != nil && game.Status == model.GameStatusInProgress {
-		remaining, err = d.Turns.RemainingSeconds(ctx, gameID, d.now())
+	if g.Turns != nil && game.Status == model.GameStatusInProgress {
+		remaining, err = g.Turns.RemainingSeconds(ctx, gameID, g.now())
 		if err != nil {
-			return nil, model.ErrInternal("failed to read turn deadline")
+			return nil, err
 		}
 	}
 	turnPlayer := ""
@@ -117,11 +166,11 @@ func buildGameState(ctx context.Context, d GameDeps, userID, gameID uuid.UUID) (
 		turnPlayer = game.CurrentTurnPlayerID.String()
 	}
 	summaries := make([]GuessSummary, len(myGuesses))
-	for i, g := range myGuesses {
+	for i, row := range myGuesses {
 		summaries[i] = GuessSummary{
-			Turn: g.Turn, GuessNumber: g.GuessNumber,
-			DigitResults: DigitResultsToInts(g.DigitResults),
-			HitCount:     g.HitCount, IsAuto: g.IsAuto,
+			Turn: row.Turn, GuessNumber: row.GuessNumber,
+			DigitResults: DigitResultsToInts(row.DigitResults),
+			HitCount:     row.HitCount, IsAuto: row.IsAuto,
 		}
 	}
 	return &GameStateOutput{
@@ -131,304 +180,16 @@ func buildGameState(ctx context.Context, d GameDeps, userID, gameID uuid.UUID) (
 	}, nil
 }
 
-func SetSecretNumber(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, secret string) error {
-	if d.Locks != nil {
-		ok, err := d.Locks.AcquireLock(ctx, secretLockKey(gameID, userID), d.GameLockTTL)
-		if err != nil {
-			return model.ErrInternal("failed to acquire secret lock")
-		}
-		if !ok {
-			return model.ErrRateLimitExceeded()
-		}
-	}
-	secretDigits, err := ValidateFourDigits(secret)
+func ensureGamePlayer(ctx context.Context, users repository.IUserRepo, userID uuid.UUID) error {
+	user, err := users.FindByID(ctx, userID)
 	if err != nil {
 		return err
-	}
-	if err := ensureGamePlayer(ctx, d.Repo, userID); err != nil {
-		return err
-	}
-	var started bool
-	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
-		game, err := d.Repo.Game.FindByIDForUpdate(ctx, gameID)
-		if err != nil {
-			return model.ErrInternal("failed to find game")
-		}
-		if game == nil {
-			return model.ErrNotFound("game not found")
-		}
-		if !game.IsParticipant(userID) {
-			return model.ErrForbidden("not a participant")
-		}
-		switch game.Status {
-		case model.GameStatusInProgress:
-			return model.ErrGameAlreadyStarted()
-		case model.GameStatusFinished:
-			return model.ErrGameAlreadyFinished()
-		case model.GameStatusWaitingSecret:
-		default:
-			return model.ErrValidation("invalid game status")
-		}
-		slot, err := game.PlayerSlot(userID)
-		if err != nil {
-			return err
-		}
-		hash, err := d.Secrets.Hash(secretDigits, gameID, slot)
-		if err != nil {
-			return model.ErrInternal("failed to hash secret")
-		}
-		if err := game.SetSecretHash(userID, hash); err != nil {
-			return err
-		}
-		game.UpdatedAt = d.now()
-		if err := d.Repo.Game.Update(ctx, game); err != nil {
-			return model.ErrInternal("failed to save secret")
-		}
-		if game.BothSecretsSet() {
-			if err := startGameInTx(ctx, d.Repo, game, d.now()); err != nil {
-				return err
-			}
-			started = true
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	if started {
-		return notifyGameStart(ctx, d, gameID)
-	}
-	return nil
-}
-
-func startGameInTx(ctx context.Context, repos repository.Repos, game *model.Game, now time.Time) error {
-	if err := game.Start(now); err != nil {
-		return err
-	}
-	return repos.Game.Update(ctx, game)
-}
-
-func notifyGameStart(ctx context.Context, d GameDeps, gameID uuid.UUID) error {
-	game, err := d.Repo.Game.FindByID(ctx, gameID)
-	if err != nil || game == nil {
-		return model.ErrInternal("failed to load started game")
-	}
-	now := d.now()
-	expires := now.Add(d.TurnDuration)
-	if d.Turns != nil && game.CurrentTurnPlayerID != nil {
-		if err := d.Turns.SetTurn(ctx, gameID, game.CurrentTurn, *game.CurrentTurnPlayerID, now, expires); err != nil {
-			return model.ErrInternal("failed to set turn deadline")
-		}
-	}
-	for _, uid := range []uuid.UUID{game.Player1ID, game.Player2ID} {
-		state, err := buildGameState(ctx, d, uid, gameID)
-		if err != nil {
-			return err
-		}
-		if d.Notifier != nil {
-			_ = d.Notifier.SendToUser(ctx, uid, "GAME_STATE_SYNC", GameStateToMap(state))
-		}
-	}
-	return notifyTurnChanged(ctx, d, game)
-}
-
-func notifyTurnChanged(ctx context.Context, d GameDeps, game *model.Game) error {
-	if d.Notifier == nil || game.CurrentTurnPlayerID == nil {
-		return nil
-	}
-	remaining := 0
-	if d.Turns != nil {
-		var err error
-		remaining, err = d.Turns.RemainingSeconds(ctx, game.ID, d.now())
-		if err != nil {
-			return model.ErrInternal("failed to read turn deadline")
-		}
-	}
-	payload := map[string]any{
-		"gameId": game.ID.String(), "currentTurn": game.CurrentTurn,
-		"currentTurnPlayerID": game.CurrentTurnPlayerID.String(),
-		"remainingSeconds":    remaining,
-	}
-	for _, uid := range []uuid.UUID{game.Player1ID, game.Player2ID} {
-		_ = d.Notifier.SendToUser(ctx, uid, "TURN_CHANGED", payload)
-	}
-	return nil
-}
-
-type guessResultOutput struct {
-	GuessID          uuid.UUID
-	PlayerID         uuid.UUID
-	Turn             int
-	DigitResults     []int
-	HitCount         int
-	IsWin            bool
-	IsAuto           bool
-	NextTurnPlayerID string
-}
-
-func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, guess string, isAuto bool) error {
-	if d.Locks != nil && !isAuto {
-		ok, err := d.Locks.AcquireLock(ctx, guessLockKey(gameID, userID), d.GameLockTTL)
-		if err != nil {
-			return model.ErrInternal("failed to acquire guess lock")
-		}
-		if !ok {
-			return model.ErrRateLimitExceeded()
-		}
-	}
-	guessDigits, err := ValidateFourDigits(guess)
-	if err != nil {
-		return err
-	}
-	if err := ensureGamePlayer(ctx, d.Repo, userID); err != nil {
-		return err
-	}
-	var result guessResultOutput
-	var finished bool
-	var winnerID uuid.UUID
-	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
-		game, err := d.Repo.Game.FindByIDForUpdate(ctx, gameID)
-		if err != nil {
-			return model.ErrInternal("failed to find game")
-		}
-		if game == nil {
-			return model.ErrNotFound("game not found")
-		}
-		if !game.IsParticipant(userID) {
-			return model.ErrForbidden("not a participant")
-		}
-		opponentHash, opponentSlot, err := game.OpponentSecretHash(userID)
-		if err != nil {
-			return err
-		}
-		if opponentHash == "" {
-			return model.ErrValidation("opponent secret not registered")
-		}
-		results, err := d.Secrets.Verify(opponentHash, guessDigits, gameID, opponentSlot)
-		if err != nil {
-			return err
-		}
-		now := d.now()
-		g, err := game.AddGuess(userID, guessDigits, results, isAuto, now)
-		if err != nil {
-			return err
-		}
-		if err := d.Repo.Guess.Create(ctx, &g); err != nil {
-			return model.ErrInternal("failed to save guess")
-		}
-		isWin := IsWin(results)
-		result = guessResultOutput{
-			GuessID: g.ID, PlayerID: userID, Turn: g.Turn,
-			DigitResults: DigitResultsToInts(g.DigitResults),
-			HitCount:     g.HitCount, IsWin: isWin, IsAuto: isAuto,
-		}
-		if isWin {
-			if err := finishGameService(ctx, d.Repo, game, userID, now); err != nil {
-				return err
-			}
-			finished = true
-			winnerID = userID
-		} else if err := d.Repo.Game.Update(ctx, game); err != nil {
-			return model.ErrInternal("failed to update game turn")
-		}
-		if game.CurrentTurnPlayerID != nil {
-			result.NextTurnPlayerID = game.CurrentTurnPlayerID.String()
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	now := d.now()
-	if err := recordGuessActivityLog(ctx, d.Repo, gameID, userID, result.Turn, result.HitCount, result.IsWin, isAuto, now); err != nil {
-		return err
-	}
-	return notifyGuessResult(ctx, d, gameID, result, finished, winnerID)
-}
-
-func finishGameService(ctx context.Context, repos repository.Repos, game *model.Game, winnerID uuid.UUID, now time.Time) error {
-	if winnerID == uuid.Nil {
-		return model.ErrInternal("winner is required")
-	}
-	loserID, err := game.OpponentID(winnerID)
-	if err != nil {
-		return err
-	}
-	winner, err := repos.User.FindByID(ctx, winnerID)
-	if err != nil || winner == nil {
-		return model.ErrInternal("failed to find winner")
-	}
-	loser, err := repos.User.FindByID(ctx, loserID)
-	if err != nil || loser == nil {
-		return model.ErrInternal("failed to find loser")
-	}
-	if err := game.Finish(winnerID, now); err != nil {
-		return err
-	}
-	if err := repos.Game.Update(ctx, game); err != nil {
-		return model.ErrInternal("failed to finish game")
-	}
-	history := model.MatchHistory{
-		ID: uuid.New(), GameID: game.ID, WinnerID: winnerID, LoserID: loserID,
-		WinnerUsername: winner.Username, LoserUsername: loser.Username,
-		FinishedAt: now, CreatedAt: now, UpdatedAt: now,
-	}
-	if err := repos.MatchHistory.Create(ctx, &history); err != nil {
-		return model.ErrInternal("failed to create match history")
-	}
-	return incrementUserWinCount(ctx, repos, winnerID, now)
-}
-
-func notifyGuessResult(ctx context.Context, d GameDeps, gameID uuid.UUID, result guessResultOutput, finished bool, winnerID uuid.UUID) error {
-	game, err := d.Repo.Game.FindByID(ctx, gameID)
-	if err != nil || game == nil {
-		return model.ErrInternal("failed to load game")
-	}
-	guessPayload := map[string]any{
-		"gameId": gameID.String(), "guessId": result.GuessID.String(),
-		"playerId": result.PlayerID.String(), "digitResults": result.DigitResults,
-		"hitCount": result.HitCount, "isWin": result.IsWin, "isAuto": result.IsAuto,
-		"nextTurnPlayerID": result.NextTurnPlayerID,
-	}
-	for _, uid := range []uuid.UUID{game.Player1ID, game.Player2ID} {
-		if d.Notifier != nil {
-			_ = d.Notifier.SendToUser(ctx, uid, "GUESS_RESULT", guessPayload)
-		}
-	}
-	if finished {
-		if d.Turns != nil {
-			_ = d.Turns.DeleteTurn(ctx, gameID)
-		}
-		if err := recordGameOverActivityLog(ctx, d.Repo, gameID, "guess_win", &winnerID, d.now()); err != nil {
-			return err
-		}
-		over := map[string]any{
-			"gameId": gameID.String(), "reason": "guess_win", "winnerId": winnerID.String(),
-		}
-		for _, uid := range []uuid.UUID{game.Player1ID, game.Player2ID} {
-			if d.Notifier != nil {
-				_ = d.Notifier.SendToUser(ctx, uid, "GAME_OVER", over)
-			}
-		}
-		return nil
-	}
-	if d.Turns != nil && game.CurrentTurnPlayerID != nil {
-		now := d.now()
-		if err := d.Turns.SetTurn(ctx, gameID, game.CurrentTurn, *game.CurrentTurnPlayerID, now, now.Add(d.TurnDuration)); err != nil {
-			return model.ErrInternal("failed to set next turn")
-		}
-	}
-	return notifyTurnChanged(ctx, d, game)
-}
-
-func ensureGamePlayer(ctx context.Context, repo repository.Repos, userID uuid.UUID) error {
-	user, err := repo.User.FindByID(ctx, userID)
-	if err != nil {
-		return model.ErrInternal("failed to find user")
 	}
 	if user == nil || user.IsDeleted() {
-		return model.ErrUnauthorized()
+		return ErrUnauthorized
 	}
 	if user.IsMaster() {
-		return model.ErrForbidden("master cannot play")
+		return ErrForbidden
 	}
 	return nil
 }
@@ -439,4 +200,23 @@ func secretLockKey(gameID, playerID uuid.UUID) string {
 
 func guessLockKey(gameID, playerID uuid.UUID) string {
 	return fmt.Sprintf("game:%s:player:%s:guess_lock", gameID, playerID)
+}
+
+func NewGameUseCase(repos repository.Repos, secrets ISecretHasher, locks IGameLockStore, turns ITurnStore, random IGuessNumberGenerator, notifier IEventNotifier, turnDuration, secretSetup, gameLockTTL time.Duration) *GameUseCase {
+	return &GameUseCase{
+		Games:        repos.Game,
+		Guesses:      repos.Guess,
+		Users:        repos.User,
+		MatchHistory: repos.MatchHistory,
+		ActivityLogs: repos.ActivityLog,
+		Repos:        repos,
+		Secrets:      secrets,
+		Locks:        locks,
+		Turns:        turns,
+		Random:       random,
+		Notifier:     notifier,
+		TurnDuration: turnDuration,
+		SecretSetup:  secretSetup,
+		GameLockTTL:  gameLockTTL,
+	}
 }

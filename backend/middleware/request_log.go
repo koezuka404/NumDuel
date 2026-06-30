@@ -31,7 +31,7 @@ func RequestLog(cfg RequestLogConfig) echo.MiddlewareFunc {
 			if shouldSkipRequestLog(c) {
 				return err
 			}
-			if cfg.Repo == nil {
+			if cfg.Repo.User == nil {
 				return err
 			}
 			status := c.Response().Status

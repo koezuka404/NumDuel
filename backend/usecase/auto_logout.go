@@ -5,83 +5,96 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/repository"
 )
 
-// AutoLogoutDeps は AutoLogoutUseCase の依存関係
-// SESSION_TIMEOUT_MINUTES 分間 last_activity_at が更新されていないユーザーを対象にする
-type AutoLogoutDeps struct {
-	Repo            repository.Repos
-	ForceLogout     model.IForceLogoutStore // Redis user:{userId}:force_logout_before
-	ForceDisconnect func(ctx context.Context, userID uuid.UUID) error // WS ERROR 送信後に切断
+// 非アクティブユーザーの自動ログアウトユースケース。
+type IAutoLogoutUsecase interface {
+	Run(ctx context.Context) error
+}
+
+type AutoLogoutUseCase struct {
+	Users           repository.IUserRepo
+	RefreshTokens   repository.IRefreshTokenRepo
+	LoginLogs       repository.ILoginLogRepo
+	DB              *gorm.DB
+	ForceLogout     IForceLogoutStore
+	ForceDisconnect func(ctx context.Context, userID uuid.UUID) error
 	SessionTimeout  time.Duration
 	Now             func() time.Time
 }
 
-func (d AutoLogoutDeps) now() time.Time {
-	if d.Now != nil {
-		return d.Now()
+func (a *AutoLogoutUseCase) now() time.Time {
+	if a != nil && a.Now != nil {
+		return a.Now().UTC()
 	}
 	return time.Now().UTC()
 }
 
-// AutoLogout は無操作ユーザーを強制ログアウトする
-// last_activity_at < now - SessionTimeout のユーザーを列挙し、1 件ずつ autoLogoutUser する
-func AutoLogout(ctx context.Context, d AutoLogoutDeps) error {
-	if d.SessionTimeout <= 0 {
+func (a *AutoLogoutUseCase) Run(ctx context.Context) error {
+	if a.SessionTimeout <= 0 {
 		return nil
 	}
-	now := d.now()
-	before := now.Add(-d.SessionTimeout)
-	users, err := d.Repo.User.ListInactiveSince(ctx, before)
+	now := a.now()
+	before := now.Add(-a.SessionTimeout)
+	users, err := a.Users.ListInactiveSince(ctx, before)
 	if err != nil {
-		return model.ErrInternal("failed to list inactive users")
+		return err
 	}
 	for _, user := range users {
 		if user == nil {
 			continue
 		}
-		if err := autoLogoutUser(ctx, d, user.ID, now); err != nil {
+		if err := a.logoutUser(ctx, user.ID, now); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// autoLogoutUser は 1 ユーザーのセッションを切る
-// 1) force_logout_before SET  2) WS 切断  3) refresh 失効 + login_logs(auto_logout) + last_activity_at 更新
-func autoLogoutUser(ctx context.Context, d AutoLogoutDeps, userID uuid.UUID, now time.Time) error {
-	if d.ForceLogout != nil {
-		if err := d.ForceLogout.SetForceLogoutBefore(ctx, userID, now); err != nil {
-			return model.ErrInternal("failed to set force logout")
+func (a *AutoLogoutUseCase) logoutUser(ctx context.Context, userID uuid.UUID, now time.Time) error {
+	if a.ForceLogout != nil {
+		if err := a.ForceLogout.SetForceLogoutBefore(ctx, userID, now); err != nil {
+			return err
 		}
 	}
-	if d.ForceDisconnect != nil {
-		_ = d.ForceDisconnect(ctx, userID)
+	if a.ForceDisconnect != nil {
+		_ = a.ForceDisconnect(ctx, userID)
 	}
-	return repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
-		if err := revokeRefreshTokensByUserID(ctx, d.Repo, userID, now); err != nil {
-			return model.ErrInternal("failed to revoke refresh tokens")
+	return repository.WithTx(ctx, a.DB, func(ctx context.Context) error {
+		if err := revokeRefreshTokensByUserID(ctx, a.RefreshTokens, userID, now); err != nil {
+			return err
 		}
-		if err := d.Repo.LoginLog.Create(ctx, &model.LoginLog{
+		if err := a.LoginLogs.Create(ctx, &model.LoginLog{
 			ID: uuid.New(), UserID: userID, Action: model.LoginActionAutoLogout,
 			CreatedAt: now, UpdatedAt: now,
 		}); err != nil {
-			return model.ErrInternal("failed to create login log")
+			return err
 		}
-		user, err := d.Repo.User.FindByID(ctx, userID)
+		user, err := a.Users.FindByID(ctx, userID)
 		if err != nil {
-			return model.ErrInternal("failed to find user")
+			return err
 		}
 		if user != nil && !user.IsDeleted() {
 			user.LastActivityAt = now
 			user.UpdatedAt = now
-			if err := d.Repo.User.Update(ctx, user); err != nil {
-				return model.ErrInternal("failed to update user")
-			}
+			return a.Users.Update(ctx, user)
 		}
 		return nil
 	})
+}
+
+func NewAutoLogoutUseCase(repos repository.Repos, forceLogout IForceLogoutStore, forceDisconnect func(context.Context, uuid.UUID) error, sessionTimeout time.Duration) *AutoLogoutUseCase {
+	return &AutoLogoutUseCase{
+		Users:           repos.User,
+		RefreshTokens:   repos.RefreshToken,
+		LoginLogs:       repos.LoginLog,
+		DB:              repos.DB,
+		ForceLogout:     forceLogout,
+		ForceDisconnect: forceDisconnect,
+		SessionTimeout:  sessionTimeout,
+	}
 }

@@ -1,26 +1,30 @@
-package usecase
+package controller
 
-import "time"
+import (
+	"time"
 
-func RegisterUserResponse(out *RegisterUserOutput) map[string]any {
+	"github.com/numduel/numduel/usecase"
+)
+
+func registerUserResponse(out *usecase.RegisterResult) map[string]any {
 	return map[string]any{
-		"id": out.ID.String(), "username": out.Username, "role": out.Role, "winCount": out.WinCount,
+		"id": out.ID, "username": out.Username, "role": out.Role, "winCount": out.WinCount,
 	}
 }
 
-func LoginResponse(out *LoginOutput) map[string]any {
+func loginResponse(out *usecase.LoginResult) map[string]any {
 	return map[string]any{
-		"id": out.ID.String(), "username": out.Username, "role": string(out.Role),
+		"id": out.ID, "username": out.Username, "role": out.Role,
 	}
 }
 
-func GetMeResponse(out *GetMeOutput) map[string]any {
+func getMeResponse(out *usecase.MeResult) map[string]any {
 	return map[string]any{
-		"id": out.ID.String(), "username": out.Username, "role": out.Role, "winCount": out.WinCount,
+		"id": out.ID, "username": out.Username, "role": out.Role, "winCount": out.WinCount,
 	}
 }
 
-func GetProfileResponse(out *GetProfileOutput) map[string]any {
+func getProfileResponse(out *usecase.GetProfileOutput) map[string]any {
 	data := map[string]any{"username": out.Username, "winCount": out.WinCount, "rank": nil}
 	if out.Rank != nil {
 		data["rank"] = *out.Rank
@@ -28,7 +32,7 @@ func GetProfileResponse(out *GetProfileOutput) map[string]any {
 	return data
 }
 
-func MatchHistoryResponse(items []MatchHistoryItem) []map[string]any {
+func matchHistoryResponse(items []usecase.MatchHistoryItem) []map[string]any {
 	rows := make([]map[string]any, len(items))
 	for i, item := range items {
 		rows[i] = map[string]any{
@@ -39,7 +43,7 @@ func MatchHistoryResponse(items []MatchHistoryItem) []map[string]any {
 	return rows
 }
 
-func LoginHistoryResponse(items []LoginHistoryItem) []map[string]any {
+func loginHistoryResponse(items []usecase.LoginHistoryItem) []map[string]any {
 	rows := make([]map[string]any, len(items))
 	for i, item := range items {
 		rows[i] = map[string]any{
@@ -49,7 +53,7 @@ func LoginHistoryResponse(items []LoginHistoryItem) []map[string]any {
 	return rows
 }
 
-func WSHistoryResponse(items []WSConnectionHistoryItem) []map[string]any {
+func wsHistoryResponse(items []usecase.WSConnectionHistoryItem) []map[string]any {
 	rows := make([]map[string]any, len(items))
 	for i, item := range items {
 		disconnected := any(nil)
@@ -65,7 +69,7 @@ func WSHistoryResponse(items []WSConnectionHistoryItem) []map[string]any {
 	return rows
 }
 
-func RankingResponse(items []RankingItem) []map[string]any {
+func rankingResponse(items []usecase.RankingItem) []map[string]any {
 	rows := make([]map[string]any, len(items))
 	for i, item := range items {
 		rows[i] = map[string]any{"rank": item.Rank, "username": item.Username, "winCount": item.WinCount}
@@ -73,7 +77,7 @@ func RankingResponse(items []RankingItem) []map[string]any {
 	return rows
 }
 
-func AdminUsersResponse(items []AdminUserItem) []map[string]any {
+func adminUsersResponse(items []usecase.AdminUserItem) []map[string]any {
 	rows := make([]map[string]any, len(items))
 	for i, u := range items {
 		var deleted any
@@ -89,7 +93,7 @@ func AdminUsersResponse(items []AdminUserItem) []map[string]any {
 	return rows
 }
 
-func ActivityLogsResponse(items []ActivityLogItem) []map[string]any {
+func activityLogsResponse(items []usecase.ActivityLogItem) []map[string]any {
 	rows := make([]map[string]any, len(items))
 	for i, item := range items {
 		var uid any
@@ -104,11 +108,11 @@ func ActivityLogsResponse(items []ActivityLogItem) []map[string]any {
 	return rows
 }
 
-func LogTypesResponse(types []string) map[string]any {
+func logTypesResponse(types []string) map[string]any {
 	return map[string]any{"logTypes": types}
 }
 
-func BackupStatusResponse(out *BackupStatusOutput) map[string]any {
+func backupStatusResponse(out *usecase.BackupStatusOutput) map[string]any {
 	data := map[string]any{"status": out.Status, "lastSyncedAt": nil}
 	if out.LastSyncedAt != nil {
 		data["lastSyncedAt"] = out.LastSyncedAt.UTC().Format(time.RFC3339)
@@ -116,18 +120,34 @@ func BackupStatusResponse(out *BackupStatusOutput) map[string]any {
 	return data
 }
 
-func StartMatchingResponse(out *StartMatchingOutput) map[string]string {
+func startMatchingResponse(out *usecase.StartMatchingOutput) map[string]string {
 	return map[string]string{"status": out.Status}
 }
 
-func CancelMatchingResponse(out *CancelMatchingOutput) map[string]string {
+func cancelMatchingResponse(out *usecase.CancelMatchingOutput) map[string]string {
 	return map[string]string{"status": out.Status}
 }
 
-func MatchingStatusResponse(out *GetMatchingStatusOutput) map[string]any {
+func matchingStatusResponse(out *usecase.GetMatchingStatusOutput) map[string]any {
 	data := map[string]any{"status": out.Status, "gameId": nil}
 	if out.GameID != nil {
 		data["gameId"] = out.GameID.String()
 	}
 	return data
+}
+
+func gameStateResponse(s *usecase.GameStateOutput) map[string]any {
+	guesses := make([]map[string]any, len(s.MyGuesses))
+	for i, row := range s.MyGuesses {
+		guesses[i] = map[string]any{
+			"turn": row.Turn, "guessNumber": row.GuessNumber,
+			"digitResults": row.DigitResults, "hitCount": row.HitCount, "isAuto": row.IsAuto,
+		}
+	}
+	return map[string]any{
+		"gameId": s.GameID.String(), "status": string(s.Status),
+		"currentTurn": s.CurrentTurn, "currentTurnPlayerID": s.CurrentTurnPlayerID,
+		"remainingSeconds": s.RemainingSeconds, "myGuesses": guesses,
+		"opponentGuessCount": s.OpponentGuessCount,
+	}
 }

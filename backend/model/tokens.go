@@ -28,3 +28,20 @@ func (t RefreshToken) IsRevoked() bool {
 func (t RefreshToken) IsExpired(now time.Time) bool {
 	return !t.ExpiresAt.After(now)
 }
+
+func (t RefreshToken) IsActive(now time.Time) bool {
+	return !t.IsRevoked() && !t.IsExpired(now)
+}
+
+func NewRefreshToken(userID uuid.UUID, hash string, familyID uuid.UUID, expiresAt, now time.Time) RefreshToken {
+	return RefreshToken{
+		ID:        uuid.New(),
+		UserID:    userID,
+		TokenHash: hash,
+		FamilyID:  familyID,
+		Status:    RefreshTokenActive,
+		ExpiresAt: expiresAt,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}

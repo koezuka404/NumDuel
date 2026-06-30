@@ -25,7 +25,7 @@ func ActivityUpdate(cfg ActivityUpdateConfig) echo.MiddlewareFunc {
 			err := next(c)
 			// Auth Middleware が SetAuth した場合のみ更新（register/login/refresh は対象外）
 			auth, ok := AuthFrom(c)
-			if !ok || cfg.Repo == nil {
+			if !ok || cfg.Repo.User == nil {
 				return err
 			}
 			now := time.Now().UTC()

@@ -1,17 +1,16 @@
-// bcrypt によるパスワードハッシュ・照合
 package crypto
 
 import (
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/usecase"
 )
 
 const bcryptCost = 12
 
 type PasswordService struct{}
 
-var _ model.IPasswordHasher = (*PasswordService)(nil)
+var _ usecase.IPasswordHasher = (*PasswordService)(nil)
 
 func NewPasswordService() *PasswordService {
 	return &PasswordService{}

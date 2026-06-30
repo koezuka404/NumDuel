@@ -1,4 +1,3 @@
-// マッチング API の HTTP ハンドラ
 package controller
 
 import (
@@ -8,53 +7,49 @@ import (
 
 	"github.com/numduel/numduel/dto"
 	"github.com/numduel/numduel/middleware"
-	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/usecase"
 )
 
 type MatchingController struct {
-	Deps usecase.MatchingDeps
+	Matching usecase.IMatchingUsecase
 }
 
-func NewMatchingController(deps usecase.MatchingDeps) *MatchingController {
-	return &MatchingController{Deps: deps}
+func NewMatchingController(matching usecase.IMatchingUsecase) *MatchingController {
+	return &MatchingController{Matching: matching}
 }
 
-// Start POST /api/matching/start
 func (h *MatchingController) Start(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
-		return dto.WriteError(c, model.ErrUnauthorized())
+		return dto.WriteError(c, usecase.ErrUnauthorized)
 	}
-	out, err := usecase.StartMatching(c.Request().Context(), h.Deps, auth.UserID)
+	out, err := h.Matching.Start(c.Request().Context(), auth.UserID)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.StartMatchingResponse(out))
+	return dto.WriteData(c, http.StatusOK, startMatchingResponse(out))
 }
 
-// Cancel POST /api/matching/cancel
 func (h *MatchingController) Cancel(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
-		return dto.WriteError(c, model.ErrUnauthorized())
+		return dto.WriteError(c, usecase.ErrUnauthorized)
 	}
-	out, err := usecase.CancelMatching(c.Request().Context(), h.Deps, auth.UserID)
+	out, err := h.Matching.Cancel(c.Request().Context(), auth.UserID)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.CancelMatchingResponse(out))
+	return dto.WriteData(c, http.StatusOK, cancelMatchingResponse(out))
 }
 
-// Status GET /api/matching/status
 func (h *MatchingController) Status(c echo.Context) error {
 	auth, ok := middleware.AuthFrom(c)
 	if !ok {
-		return dto.WriteError(c, model.ErrUnauthorized())
+		return dto.WriteError(c, usecase.ErrUnauthorized)
 	}
-	out, err := usecase.GetMatchingStatus(c.Request().Context(), h.Deps, auth.UserID)
+	out, err := h.Matching.Status(c.Request().Context(), auth.UserID)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.MatchingStatusResponse(out))
+	return dto.WriteData(c, http.StatusOK, matchingStatusResponse(out))
 }

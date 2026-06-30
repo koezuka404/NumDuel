@@ -2,30 +2,30 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
 )
 
-// HandleTimeout はターン期限切れ時に自動予想を 1 回実行する
-func HandleTimeout(ctx context.Context, d GameDeps, gameID, playerID uuid.UUID) error {
-	now := d.now()
-	if d.Locks != nil {
-		ok, err := d.Locks.AcquireLock(ctx, guessLockKey(gameID, playerID), d.GameLockTTL)
+func (g *GameUseCase) HandleTimeout(ctx context.Context, gameID, playerID uuid.UUID) error {
+	now := g.now()
+	if g.Locks != nil {
+		ok, err := g.Locks.AcquireLock(ctx, guessLockKey(gameID, playerID), g.GameLockTTL)
 		if err != nil {
-			return model.ErrInternal("failed to acquire guess lock")
+			return err
 		}
 		if !ok {
 			return nil
 		}
 	}
-	if d.Turns == nil {
+	if g.Turns == nil {
 		return nil
 	}
-	turnInfo, err := d.Turns.GetTurn(ctx, gameID)
+	turnInfo, err := g.Turns.GetTurn(ctx, gameID)
 	if err != nil {
-		return model.ErrInternal("failed to read turn deadline")
+		return err
 	}
 	if turnInfo == nil {
 		return nil
@@ -36,36 +36,36 @@ func HandleTimeout(ctx context.Context, d GameDeps, gameID, playerID uuid.UUID) 
 	if turnInfo.ExpiresAt.After(now) {
 		return nil
 	}
-	if err := validateTimeoutGame(ctx, d, gameID, playerID, turnInfo.Turn); err != nil {
+	if err := g.validateTimeoutGame(ctx, gameID, playerID, turnInfo.Turn); err != nil {
 		return err
 	}
-	turnInfo, err = d.Turns.GetTurn(ctx, gameID)
+	turnInfo, err = g.Turns.GetTurn(ctx, gameID)
 	if err != nil {
-		return model.ErrInternal("failed to re-read turn deadline")
+		return err
 	}
 	if turnInfo == nil || turnInfo.PlayerID != playerID || turnInfo.ExpiresAt.After(now) {
 		return nil
 	}
-	if d.Random == nil {
-		return model.ErrInternal("random number generator is not configured")
+	if g.Random == nil {
+		return errors.New("random number generator is not configured")
 	}
-	guessNum, err := d.Random.GenerateGuessNumber()
+	guessNum, err := g.Random.GenerateGuessNumber()
 	if err != nil {
 		return err
 	}
-	if err := SubmitGuess(ctx, d, playerID, gameID, guessNum.String(), true); err != nil {
+	if err := g.SubmitGuess(ctx, playerID, gameID, guessNum, true); err != nil {
 		if isTimeoutRaceError(err) {
 			return nil
 		}
 		return err
 	}
-	return recordTimeoutActivityLog(ctx, d.Repo, gameID, playerID, now)
+	return recordTimeoutActivityLog(ctx, g.Repos, gameID, playerID, now)
 }
 
-func validateTimeoutGame(ctx context.Context, d GameDeps, gameID, playerID uuid.UUID, redisTurn int) error {
-	game, err := d.Repo.Game.FindByID(ctx, gameID)
+func (g *GameUseCase) validateTimeoutGame(ctx context.Context, gameID, playerID uuid.UUID, redisTurn int) error {
+	game, err := g.Games.FindByID(ctx, gameID)
 	if err != nil {
-		return model.ErrInternal("failed to find game")
+		return err
 	}
 	if game == nil {
 		return nil
@@ -83,14 +83,8 @@ func validateTimeoutGame(ctx context.Context, d GameDeps, gameID, playerID uuid.
 }
 
 func isTimeoutRaceError(err error) bool {
-	de, ok := model.IsDomainError(err)
-	if !ok {
-		return false
-	}
-	switch de.Code {
-	case model.CodeNotYourTurn, model.CodeGameAlreadyFinished, model.CodeGameNotStarted, model.CodeNotFound:
-		return true
-	default:
-		return false
-	}
+	return errors.Is(err, ErrNotYourTurn) ||
+		errors.Is(err, ErrGameAlreadyFinished) ||
+		errors.Is(err, ErrGameNotStarted) ||
+		errors.Is(err, ErrNotFound)
 }

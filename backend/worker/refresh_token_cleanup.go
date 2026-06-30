@@ -10,19 +10,18 @@ import (
 	"github.com/numduel/numduel/usecase"
 )
 
-// RefreshTokenCleanupWorker は REFRESH_TOKEN_CLEANUP_CRON に従い refresh_tokens を削除する
 type RefreshTokenCleanupWorker struct {
-	Deps usecase.RefreshTokenCleanupDeps
+	Auth *usecase.AuthUseCase
 	Cron string
 }
 
 func (w *RefreshTokenCleanupWorker) Run(ctx context.Context) {
-	if w.Cron == "" {
+	if w.Cron == "" || w.Auth == nil {
 		return
 	}
 	sched := cron.New(cron.WithLocation(time.UTC))
 	if _, err := sched.AddFunc(w.Cron, func() {
-		usecase.RunRefreshTokenCleanup(ctx, w.Deps)
+		w.Auth.CleanupExpiredRefreshTokens(ctx)
 	}); err != nil {
 		log.Printf("refresh token cleanup worker: invalid cron %q: %v", w.Cron, err)
 		return

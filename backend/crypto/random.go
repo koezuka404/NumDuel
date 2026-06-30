@@ -2,35 +2,35 @@ package crypto
 
 import (
 	"crypto/rand"
+	"fmt"
 	"math/big"
 
-	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/usecase"
 )
 
 type RandomNumberService struct{}
 
-var _ model.IGuessNumberGenerator = (*RandomNumberService)(nil)
+var _ usecase.IGuessNumberGenerator = (*RandomNumberService)(nil)
 
 func NewRandomNumberService() *RandomNumberService {
 	return &RandomNumberService{}
 }
 
-// GenerateGuessNumber は重複なし 4 桁（0〜9 から 4 つ）を crypto/rand で生成する
-func (s *RandomNumberService) GenerateGuessNumber() (model.GuessNumber, error) {
+func (s *RandomNumberService) GenerateGuessNumber() (string, error) {
 	pool := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	for i := 0; i < 4; i++ {
 		j, err := randInt(i, len(pool)-1)
 		if err != nil {
-			return model.GuessNumber{}, model.ErrInternal("failed to generate guess number")
+			return "", err
 		}
 		pool[i], pool[j] = pool[j], pool[i]
 	}
-	return model.NewGuessNumber([4]int{pool[0], pool[1], pool[2], pool[3]})
+	return fmt.Sprintf("%d%d%d%d", pool[0], pool[1], pool[2], pool[3]), nil
 }
 
 func randInt(min, max int) (int, error) {
 	if max < min {
-		return 0, model.ErrInternal("invalid random range")
+		return 0, fmt.Errorf("invalid random range")
 	}
 	n, err := rand.Int(rand.Reader, big.NewInt(int64(max-min+1)))
 	if err != nil {

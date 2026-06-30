@@ -10,9 +10,20 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// ProfileDeps はプロフィール・履歴 UseCase の依存関係
-type ProfileDeps struct {
-	Repo repository.Repos
+// プロフィール・履歴取得ユースケース。
+type IProfileUsecase interface {
+	GetProfile(ctx context.Context, userID uuid.UUID) (*GetProfileOutput, error)
+	GetMatchHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]MatchHistoryItem, int64, error)
+	GetLoginHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]LoginHistoryItem, int64, error)
+	GetWSHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]WSConnectionHistoryItem, int64, error)
+}
+
+type ProfileUseCase struct {
+	Users        repository.IUserRepo
+	Rankings     repository.IRankingRepo
+	MatchHistory repository.IMatchHistoryRepo
+	LoginLogs    repository.ILoginLogRepo
+	WSLogs       repository.IWSConnectionLogRepo
 }
 
 type GetProfileOutput struct {
@@ -39,18 +50,18 @@ type WSConnectionHistoryItem struct {
 	DisconnectedAt *time.Time
 }
 
-func GetProfile(ctx context.Context, d ProfileDeps, userID uuid.UUID) (*GetProfileOutput, error) {
-	user, err := d.Repo.User.FindByID(ctx, userID)
+func (p *ProfileUseCase) GetProfile(ctx context.Context, userID uuid.UUID) (*GetProfileOutput, error) {
+	user, err := p.Users.FindByID(ctx, userID)
 	if err != nil {
-		return nil, model.ErrInternal("failed to find user")
+		return nil, err
 	}
 	if user == nil || user.IsDeleted() {
-		return nil, model.ErrUnauthorized()
+		return nil, ErrUnauthorized
 	}
 	out := &GetProfileOutput{Username: user.Username, WinCount: user.WinCount}
-	rankings, err := d.Repo.Ranking.ListAll(ctx)
+	rankings, err := p.Rankings.ListAll(ctx)
 	if err != nil {
-		return nil, model.ErrInternal("failed to load rankings")
+		return nil, err
 	}
 	for _, r := range rankings {
 		if r.UserID == userID {
@@ -62,17 +73,17 @@ func GetProfile(ctx context.Context, d ProfileDeps, userID uuid.UUID) (*GetProfi
 	return out, nil
 }
 
-func GetMatchHistory(ctx context.Context, d ProfileDeps, userID uuid.UUID, page, limit int) ([]MatchHistoryItem, int64, error) {
-	user, err := d.Repo.User.FindByID(ctx, userID)
+func (p *ProfileUseCase) GetMatchHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]MatchHistoryItem, int64, error) {
+	user, err := p.Users.FindByID(ctx, userID)
 	if err != nil {
-		return nil, 0, model.ErrInternal("failed to find user")
+		return nil, 0, err
 	}
 	if user == nil || user.IsDeleted() {
-		return nil, 0, model.ErrUnauthorized()
+		return nil, 0, ErrUnauthorized
 	}
-	rows, total, err := d.Repo.MatchHistory.ListByUserID(ctx, userID, page, limit)
+	rows, total, err := p.MatchHistory.ListByUserID(ctx, userID, page, limit)
 	if err != nil {
-		return nil, 0, model.ErrInternal("failed to load match history")
+		return nil, 0, err
 	}
 	items := make([]MatchHistoryItem, len(rows))
 	for i, h := range rows {
@@ -84,42 +95,52 @@ func GetMatchHistory(ctx context.Context, d ProfileDeps, userID uuid.UUID, page,
 	return items, total, nil
 }
 
-func GetLoginHistory(ctx context.Context, d ProfileDeps, userID uuid.UUID, page, limit int) ([]LoginHistoryItem, int64, error) {
-	user, err := d.Repo.User.FindByID(ctx, userID)
+func (p *ProfileUseCase) GetLoginHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]LoginHistoryItem, int64, error) {
+	user, err := p.Users.FindByID(ctx, userID)
 	if err != nil {
-		return nil, 0, model.ErrInternal("failed to find user")
+		return nil, 0, err
 	}
 	if user == nil || user.IsDeleted() {
-		return nil, 0, model.ErrUnauthorized()
+		return nil, 0, ErrUnauthorized
 	}
-	rows, total, err := d.Repo.LoginLog.ListByUserID(ctx, userID, page, limit)
+	rows, total, err := p.LoginLogs.ListByUserID(ctx, userID, page, limit)
 	if err != nil {
-		return nil, 0, model.ErrInternal("failed to load login history")
+		return nil, 0, err
 	}
 	items := make([]LoginHistoryItem, len(rows))
-	for i, l := range rows {
-		items[i] = LoginHistoryItem{Action: l.Action, CreatedAt: l.CreatedAt}
+	for i, row := range rows {
+		items[i] = LoginHistoryItem{Action: row.Action, CreatedAt: row.CreatedAt}
 	}
 	return items, total, nil
 }
 
-func GetWSHistory(ctx context.Context, d ProfileDeps, userID uuid.UUID, page, limit int) ([]WSConnectionHistoryItem, int64, error) {
-	user, err := d.Repo.User.FindByID(ctx, userID)
+func (p *ProfileUseCase) GetWSHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]WSConnectionHistoryItem, int64, error) {
+	user, err := p.Users.FindByID(ctx, userID)
 	if err != nil {
-		return nil, 0, model.ErrInternal("failed to find user")
+		return nil, 0, err
 	}
 	if user == nil || user.IsDeleted() {
-		return nil, 0, model.ErrUnauthorized()
+		return nil, 0, ErrUnauthorized
 	}
-	rows, total, err := d.Repo.WSConnectionLog.ListByUserID(ctx, userID, page, limit)
+	rows, total, err := p.WSLogs.ListByUserID(ctx, userID, page, limit)
 	if err != nil {
-		return nil, 0, model.ErrInternal("failed to load ws history")
+		return nil, 0, err
 	}
 	items := make([]WSConnectionHistoryItem, len(rows))
-	for i, l := range rows {
+	for i, row := range rows {
 		items[i] = WSConnectionHistoryItem{
-			ConnectionID: l.ConnectionID, ConnectedAt: l.ConnectedAt, DisconnectedAt: l.DisconnectedAt,
+			ConnectionID: row.ConnectionID, ConnectedAt: row.ConnectedAt, DisconnectedAt: row.DisconnectedAt,
 		}
 	}
 	return items, total, nil
+}
+
+func NewProfileUseCase(repos repository.Repos) *ProfileUseCase {
+	return &ProfileUseCase{
+		Users:        repos.User,
+		Rankings:     repos.Ranking,
+		MatchHistory: repos.MatchHistory,
+		LoginLogs:    repos.LoginLog,
+		WSLogs:       repos.WSConnectionLog,
+	}
 }

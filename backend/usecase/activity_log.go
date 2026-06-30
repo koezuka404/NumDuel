@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,13 +15,13 @@ import (
 func recordActivityLog(ctx context.Context, repo repository.Repos, userID *uuid.UUID, logType string, detail any, now time.Time) error {
 	raw, err := json.Marshal(detail)
 	if err != nil {
-		return model.ErrInternal("failed to build activity log")
+		return fmt.Errorf("failed to build activity log")
 	}
 	if err := repo.ActivityLog.Create(ctx, &model.ActivityLog{
 		ID: uuid.New(), UserID: userID, LogType: logType,
 		Detail: raw, CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
-		return model.ErrInternal("failed to save activity log")
+		return fmt.Errorf("failed to save activity log")
 	}
 	return nil
 }

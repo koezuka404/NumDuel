@@ -10,19 +10,18 @@ import (
 	"github.com/numduel/numduel/usecase"
 )
 
-// BackupWorker は BACKUP_CRON に従い primary → backup DB へ差分 UPSERT する（§12.8）
 type BackupWorker struct {
-	Deps usecase.BackupDeps
-	Cron string
+	Backup *usecase.BackupUseCase
+	Cron   string
 }
 
 func (w *BackupWorker) Run(ctx context.Context) {
-	if w.Deps.Syncer == nil || w.Cron == "" {
+	if w.Backup == nil || w.Cron == "" {
 		return
 	}
 	sched := cron.New(cron.WithLocation(time.UTC))
 	if _, err := sched.AddFunc(w.Cron, func() {
-		if err := usecase.RunBackupSync(ctx, w.Deps); err != nil {
+		if err := w.Backup.RunSync(ctx); err != nil {
 			log.Printf("backup worker: %v", err)
 		}
 	}); err != nil {

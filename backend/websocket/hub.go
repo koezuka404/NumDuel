@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	gorillaws "github.com/gorilla/websocket"
 
-	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/usecase"
 )
 
 type Hub struct {
@@ -24,7 +24,7 @@ type clientConn struct {
 	conn   *gorillaws.Conn
 }
 
-var _ model.IEventNotifier = (*Hub)(nil)
+var _ usecase.IEventNotifier = (*Hub)(nil)
 
 func NewHub() *Hub {
 	return &Hub{clients: make(map[uuid.UUID]*clientConn)}
@@ -92,12 +92,12 @@ func (h *Hub) SendPong(userID uuid.UUID) {
 // SessionStore は Hub 切断 + Redis キー削除をまとめる
 type SessionStore struct {
 	Hub   *Hub
-	Redis model.IWSSessionStore
+	Redis usecase.IWSSessionStore
 }
 
-var _ model.IWSSessionStore = (*SessionStore)(nil)
+var _ usecase.IWSSessionStore = (*SessionStore)(nil)
 
-func NewSessionStore(hub *Hub, redis model.IWSSessionStore) *SessionStore {
+func NewSessionStore(hub *Hub, redis usecase.IWSSessionStore) *SessionStore {
 	return &SessionStore{Hub: hub, Redis: redis}
 }
 

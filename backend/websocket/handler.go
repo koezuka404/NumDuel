@@ -12,16 +12,15 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/numduel/numduel/middleware"
-	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/usecase"
 )
 
 type Handler struct {
 	Hub     *Hub
-	WSAuth  usecase.WSAuthDeps
-	Game    usecase.GameDeps
+	WSAuth  usecase.IWSAuthUsecase
+	Game    usecase.IGameUsecase
 	Allowed map[string]struct{}
-	Redis   model.IWSSessionStore
+	Redis   usecase.IWSSessionStore
 	JWTMin  int
 }
 
@@ -82,22 +81,22 @@ func (h *Handler) Handle(c echo.Context) error {
 
 		if userID == uuid.Nil {
 			if msgType != "AUTH" {
-				h.writeError(conn, model.CodeUnauthorized, "authentication required")
+				h.writeError(conn, "unauthorized", "authentication required")
 				continue
 			}
 			token := ""
 			if ck, err := c.Request().Cookie(middleware.AccessCookieName); err == nil {
 				token = ck.Value
 			}
-			out, err := usecase.AuthenticateWebSocket(ctx, h.WSAuth, token)
+			out, err := h.WSAuth.Authenticate(ctx, token)
 			if err != nil {
-				h.writeDomainError(conn, err)
+				h.writeUseCaseError(conn, err)
 				continue
 			}
 			userID = out.UserID
-			wsLogID, err = usecase.RecordWSConnection(ctx, h.WSAuth, userID, connID)
+			wsLogID, err = h.WSAuth.RecordConnection(ctx, userID, connID)
 			if err != nil {
-				h.writeDomainError(conn, err)
+				h.writeUseCaseError(conn, err)
 				continue
 			}
 			h.Hub.Register(userID, connID, conn)
@@ -109,46 +108,46 @@ func (h *Handler) Handle(c echo.Context) error {
 			_ = h.writeJSON(conn, map[string]any{
 				"type": "AUTH_OK", "data": map[string]string{"userId": userID.String()},
 			})
-			usecase.NotifyOpponentConnected(ctx, h.WSAuth, userID)
+			h.WSAuth.NotifyOpponentConnected(ctx, userID)
 			continue
 		}
 
 		switch msgType {
 		case "PING":
-			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
+			h.WSAuth.TouchActivity(ctx, userID)
 			_ = h.writeJSON(conn, map[string]any{"type": "PONG"})
 		case "SET_SECRET":
-			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
+			h.WSAuth.TouchActivity(ctx, userID)
 			gameID, err := uuid.Parse(msg.GameID)
 			if err != nil {
-				h.Hub.SendError(userID, model.CodeValidation, "invalid gameId")
+				h.Hub.SendError(userID, "validation_error", "invalid gameId")
 				continue
 			}
-			if err := usecase.SetSecretNumber(ctx, h.Game, userID, gameID, msg.SecretNumber); err != nil {
-				h.sendDomainError(userID, err)
+			if err := h.Game.SetSecretNumber(ctx, userID, gameID, msg.SecretNumber); err != nil {
+				h.sendUseCaseError(userID, err)
 			}
 		case "GUESS":
-			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
+			h.WSAuth.TouchActivity(ctx, userID)
 			gameID, err := uuid.Parse(msg.GameID)
 			if err != nil {
-				h.Hub.SendError(userID, model.CodeValidation, "invalid gameId")
+				h.Hub.SendError(userID, "validation_error", "invalid gameId")
 				continue
 			}
-			if err := usecase.SubmitGuess(ctx, h.Game, userID, gameID, msg.GuessNumber, false); err != nil {
-				h.sendDomainError(userID, err)
+			if err := h.Game.SubmitGuess(ctx, userID, gameID, msg.GuessNumber, false); err != nil {
+				h.sendUseCaseError(userID, err)
 			}
 		case "SYNC_REQUEST":
-			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
+			h.WSAuth.TouchActivity(ctx, userID)
 			gameID, err := uuid.Parse(msg.GameID)
 			if err != nil {
-				h.Hub.SendError(userID, model.CodeValidation, "invalid gameId")
+				h.Hub.SendError(userID, "validation_error", "invalid gameId")
 				continue
 			}
-			if _, err := usecase.SyncGameState(ctx, h.Game, userID, gameID); err != nil {
-				h.sendDomainError(userID, err)
+			if _, err := h.Game.SyncGameState(ctx, userID, gameID); err != nil {
+				h.sendUseCaseError(userID, err)
 			}
 		default:
-			h.Hub.SendError(userID, model.CodeValidation, "unknown event type")
+			h.Hub.SendError(userID, "validation_error", "unknown event type")
 		}
 	}
 }
@@ -158,28 +157,18 @@ func (h *Handler) onDisconnect(ctx context.Context, userID, wsLogID uuid.UUID) {
 	if h.Redis != nil {
 		_ = h.Redis.DeleteUser(ctx, userID)
 	}
-	usecase.CloseWSConnectionLog(ctx, h.WSAuth, wsLogID)
-	usecase.NotifyOpponentDisconnected(ctx, h.WSAuth, userID)
+	h.WSAuth.CloseConnectionLog(ctx, wsLogID)
+	h.WSAuth.NotifyOpponentDisconnected(ctx, userID)
 }
 
-func (h *Handler) sendDomainError(userID uuid.UUID, err error) {
-	if de, ok := model.IsDomainError(err); ok {
-		h.Hub.SendError(userID, de.Code, de.Error())
-		return
-	}
-	h.Hub.SendError(userID, model.CodeInternalError, "internal server error")
+func (h *Handler) sendUseCaseError(userID uuid.UUID, err error) {
+	code, msg := wsErrorCode(err)
+	h.Hub.SendError(userID, code, msg)
 }
 
-func (h *Handler) writeDomainError(conn *gorillaws.Conn, err error) {
-	if de, ok := model.IsDomainError(err); ok {
-		_ = h.writeJSON(conn, map[string]any{
-			"type": "ERROR", "data": map[string]string{"code": de.Code, "message": de.Error()},
-		})
-		return
-	}
-	_ = h.writeJSON(conn, map[string]any{
-		"type": "ERROR", "data": map[string]string{"code": model.CodeInternalError, "message": "internal server error"},
-	})
+func (h *Handler) writeUseCaseError(conn *gorillaws.Conn, err error) {
+	code, msg := wsErrorCode(err)
+	h.writeError(conn, code, msg)
 }
 
 func (h *Handler) writeError(conn *gorillaws.Conn, code, message string) {

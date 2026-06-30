@@ -10,18 +10,17 @@ import (
 )
 
 type RankingController struct {
-	Deps usecase.RankingDeps
+	Ranking usecase.IRankingUsecase
 }
 
-func NewRankingController(deps usecase.RankingDeps) *RankingController {
-	return &RankingController{Deps: deps}
+func NewRankingController(ranking usecase.IRankingUsecase) *RankingController {
+	return &RankingController{Ranking: ranking}
 }
 
-// Get GET /api/ranking — 上位 3 名
 func (h *RankingController) Get(c echo.Context) error {
-	items, err := usecase.GetRanking(c.Request().Context(), h.Deps)
+	items, err := h.Ranking.Get(c.Request().Context())
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusOK, usecase.RankingResponse(items))
+	return dto.WriteData(c, http.StatusOK, rankingResponse(items))
 }

@@ -2,12 +2,12 @@
 package middleware
 
 import (
+	"errors"
 	"log"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/numduel/numduel/dto"
-	"github.com/numduel/numduel/model"
 )
 
 // Recover は Handler / 下流 Middleware 内の panic を捕捉する
@@ -18,7 +18,7 @@ func Recover() echo.MiddlewareFunc {
 			defer func() {
 				if r := recover(); r != nil {
 					log.Printf("panic: %v", r)
-					err = dto.WriteError(c, model.ErrInternal("internal server error"))
+					err = dto.WriteError(c, errors.New("internal server error"))
 				}
 			}()
 			return next(c)

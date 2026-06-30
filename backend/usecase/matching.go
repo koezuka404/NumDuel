@@ -10,106 +10,76 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// MatchingDeps はマッチング UseCase の依存関係
-type MatchingDeps struct {
-	Repo     repository.Repos
-	Notifier model.IEventNotifier
-	Now      func() time.Time
+// マッチングキューのユースケース。
+type IMatchingUsecase interface {
+	Start(ctx context.Context, userID uuid.UUID) (*StartMatchingOutput, error)
+	Cancel(ctx context.Context, userID uuid.UUID) (*CancelMatchingOutput, error)
+	Status(ctx context.Context, userID uuid.UUID) (*GetMatchingStatusOutput, error)
 }
 
-func (d MatchingDeps) now() time.Time {
-	if d.Now != nil {
-		return d.Now()
+type MatchingUseCase struct {
+	Users         repository.IUserRepo
+	Games         repository.IGameRepo
+	MatchingQueue repository.IMatchingQueueRepo
+	Repos         repository.Repos
+	Notifier      IEventNotifier
+	Now           func() time.Time
+}
+
+func (m *MatchingUseCase) now() time.Time {
+	if m != nil && m.Now != nil {
+		return m.Now().UTC()
 	}
 	return time.Now().UTC()
 }
 
 type StartMatchingOutput struct {
-	Status string // 常に "waiting"（即時ペアリング時も同じ）
+	Status string
 }
 
 type CancelMatchingOutput struct {
-	Status string // "cancelled"
+	Status string
 }
 
 type GetMatchingStatusOutput struct {
 	Status string
-	GameID *uuid.UUID // matched 時のみ
+	GameID *uuid.UUID
 }
 
-// MatchPlayers は待機キュー先頭 2 人をペアリングして Game を作成する（同一 TX 内）
-func MatchPlayers(ctx context.Context, d MatchingDeps, repos repository.Repos) (*model.Game, error) {
-	entries, err := repos.MatchingQueue.ListByStatusForUpdate(ctx, model.MatchingQueueWaiting, 2)
+func (m *MatchingUseCase) Start(ctx context.Context, userID uuid.UUID) (*StartMatchingOutput, error) {
+	user, err := m.Users.FindByID(ctx, userID)
 	if err != nil {
-		return nil, model.ErrInternal("failed to load matching queue")
-	}
-	if len(entries) < 2 {
-		return nil, nil
-	}
-	p1, p2 := entries[0], entries[1]
-	if p1.UserID == p2.UserID {
-		return nil, model.ErrInternal("invalid matching pair")
-	}
-	if ok, err := matchingPlayerReady(ctx, d.Repo, p1.UserID); err != nil {
-		return nil, model.ErrInternal("failed to validate matching player")
-	} else if !ok {
-		return nil, removeQueueEntries(ctx, repos, []uuid.UUID{p1.ID})
-	}
-	if ok, err := matchingPlayerReady(ctx, d.Repo, p2.UserID); err != nil {
-		return nil, model.ErrInternal("failed to validate matching player")
-	} else if !ok {
-		return nil, removeQueueEntries(ctx, repos, []uuid.UUID{p2.ID})
-	}
-	now := d.now()
-	game := &model.Game{
-		ID: uuid.New(), Status: model.GameStatusWaitingSecret,
-		Player1ID: p1.UserID, Player2ID: p2.UserID,
-		CurrentTurn: 1, CreatedAt: now, UpdatedAt: now,
-	}
-	if err := repos.Game.Create(ctx, game); err != nil {
-		return nil, model.ErrInternal("failed to create game")
-	}
-	if err := removeQueueEntries(ctx, repos, []uuid.UUID{p1.ID, p2.ID}); err != nil {
 		return nil, err
 	}
-	return game, nil
-}
-
-// StartMatching はキュー登録後、同一 TX 内で MatchPlayers を呼ぶ
-func StartMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*StartMatchingOutput, error) {
-	user, err := d.Repo.User.FindByID(ctx, userID)
-	if err != nil {
-		return nil, model.ErrInternal("failed to find user")
-	}
 	if user == nil || user.IsDeleted() {
-		return nil, model.ErrUnauthorized()
+		return nil, ErrUnauthorized
 	}
 	if user.IsMaster() {
-		return nil, model.ErrForbidden("master cannot start matching")
+		return nil, ErrForbidden
 	}
-	active, err := FindActiveGameForUser(ctx, d.Repo, userID)
+	active, err := findActiveGameForUser(ctx, m.Repos, userID)
 	if err != nil {
-		return nil, model.ErrInternal("failed to check active game")
+		return nil, err
 	}
 	if active != nil {
-		return nil, model.ErrUserInActiveGame()
+		return nil, ErrUserInActiveGame
 	}
-	waiting, err := userWaitingInMatchingQueue(ctx, d.Repo, userID)
+	waiting, err := userWaitingInMatchingQueue(ctx, m.Repos, userID)
 	if err != nil {
-		return nil, model.ErrInternal("failed to check matching queue")
+		return nil, err
 	}
 	if waiting {
-		return nil, model.ErrAlreadyInMatching()
+		return nil, ErrAlreadyInMatching
 	}
 	var matched *model.Game
-	now := d.now()
-	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
-		if err := d.Repo.MatchingQueue.Insert(ctx, &model.MatchingQueueEntry{
+	now := m.now()
+	if err := repository.WithTx(ctx, m.Repos.DB, func(ctx context.Context) error {
+		if err := m.MatchingQueue.Insert(ctx, &model.MatchingQueueEntry{
 			ID: uuid.New(), UserID: userID, Status: model.MatchingQueueWaiting, CreatedAt: now,
 		}); err != nil {
-			return model.ErrInternal("failed to join matching queue")
+			return err
 		}
-		game, err := MatchPlayers(ctx, d, d.Repo)
+		game, err := m.matchPlayers(ctx)
 		if err != nil {
 			return err
 		}
@@ -118,40 +88,77 @@ func StartMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*Star
 	}); err != nil {
 		return nil, err
 	}
-	if matched != nil && d.Notifier != nil {
+	if matched != nil && m.Notifier != nil {
 		payload := map[string]any{"gameId": matched.ID.String()}
-		_ = d.Notifier.SendToUser(ctx, matched.Player1ID, "MATCHED", payload)
-		_ = d.Notifier.SendToUser(ctx, matched.Player2ID, "MATCHED", payload)
+		_ = m.Notifier.SendToUser(ctx, matched.Player1ID, "MATCHED", payload)
+		_ = m.Notifier.SendToUser(ctx, matched.Player2ID, "MATCHED", payload)
 	}
 	return &StartMatchingOutput{Status: "waiting"}, nil
 }
 
-func CancelMatching(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*CancelMatchingOutput, error) {
-	if err := repository.WithTx(ctx, d.Repo.DB, func(ctx context.Context) error {
-		return d.Repo.MatchingQueue.DeleteByUserID(ctx, userID)
+func (m *MatchingUseCase) Cancel(ctx context.Context, userID uuid.UUID) (*CancelMatchingOutput, error) {
+	if err := repository.WithTx(ctx, m.Repos.DB, func(ctx context.Context) error {
+		return m.MatchingQueue.DeleteByUserID(ctx, userID)
 	}); err != nil {
 		return nil, err
 	}
 	return &CancelMatchingOutput{Status: "cancelled"}, nil
 }
 
-func GetMatchingStatus(ctx context.Context, d MatchingDeps, userID uuid.UUID) (*GetMatchingStatusOutput, error) {
-	active, err := FindActiveGameForUser(ctx, d.Repo, userID)
+func (m *MatchingUseCase) Status(ctx context.Context, userID uuid.UUID) (*GetMatchingStatusOutput, error) {
+	active, err := findActiveGameForUser(ctx, m.Repos, userID)
 	if err != nil {
-		return nil, model.ErrInternal("failed to check active game")
+		return nil, err
 	}
 	if active != nil {
 		id := active.ID
 		return &GetMatchingStatusOutput{Status: "matched", GameID: &id}, nil
 	}
-	waiting, err := userWaitingInMatchingQueue(ctx, d.Repo, userID)
+	waiting, err := userWaitingInMatchingQueue(ctx, m.Repos, userID)
 	if err != nil {
-		return nil, model.ErrInternal("failed to check matching queue")
+		return nil, err
 	}
 	if waiting {
 		return &GetMatchingStatusOutput{Status: "waiting"}, nil
 	}
 	return &GetMatchingStatusOutput{Status: "idle"}, nil
+}
+
+func (m *MatchingUseCase) matchPlayers(ctx context.Context) (*model.Game, error) {
+	entries, err := m.MatchingQueue.ListByStatusForUpdate(ctx, model.MatchingQueueWaiting, 2)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) < 2 {
+		return nil, nil
+	}
+	p1, p2 := entries[0], entries[1]
+	if p1.UserID == p2.UserID {
+		return nil, ErrBadRequest
+	}
+	if ok, err := matchingPlayerReady(ctx, m.Repos, p1.UserID); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, removeQueueEntries(ctx, m.Repos, []uuid.UUID{p1.ID})
+	}
+	if ok, err := matchingPlayerReady(ctx, m.Repos, p2.UserID); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, removeQueueEntries(ctx, m.Repos, []uuid.UUID{p2.ID})
+	}
+	now := m.now()
+	game := &model.Game{
+		ID: uuid.New(), Status: model.GameStatusWaitingSecret,
+		Player1ID: p1.UserID, Player2ID: p2.UserID,
+		CurrentTurn: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := m.Games.Create(ctx, game); err != nil {
+		return nil, err
+	}
+	if err := removeQueueEntries(ctx, m.Repos, []uuid.UUID{p1.ID, p2.ID}); err != nil {
+		return nil, err
+	}
+	return game, nil
 }
 
 func matchingPlayerReady(ctx context.Context, repo repository.Repos, userID uuid.UUID) (bool, error) {
@@ -162,7 +169,7 @@ func matchingPlayerReady(ctx context.Context, repo repository.Repos, userID uuid
 	if user == nil || user.IsDeleted() || user.IsMaster() {
 		return false, nil
 	}
-	active, err := FindActiveGameForUser(ctx, repo, userID)
+	active, err := findActiveGameForUser(ctx, repo, userID)
 	if err != nil {
 		return false, err
 	}
@@ -170,8 +177,36 @@ func matchingPlayerReady(ctx context.Context, repo repository.Repos, userID uuid
 }
 
 func removeQueueEntries(ctx context.Context, repos repository.Repos, ids []uuid.UUID) error {
-	if err := repos.MatchingQueue.DeleteByIDs(ctx, ids); err != nil {
-		return model.ErrInternal("failed to cleanup matching queue")
+	return repos.MatchingQueue.DeleteByIDs(ctx, ids)
+}
+
+func userWaitingInMatchingQueue(ctx context.Context, repo repository.Repos, userID uuid.UUID) (bool, error) {
+	entry, err := repo.MatchingQueue.FindByUserID(ctx, userID)
+	if err != nil || entry == nil {
+		return false, err
 	}
-	return nil
+	return entry.Status == model.MatchingQueueWaiting, nil
+}
+
+func findActiveGameForUser(ctx context.Context, repo repository.Repos, userID uuid.UUID) (*model.Game, error) {
+	games, err := repo.Game.ListByPlayerID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	for _, game := range games {
+		if game.Status == model.GameStatusWaitingSecret || game.Status == model.GameStatusInProgress {
+			return game, nil
+		}
+	}
+	return nil, nil
+}
+
+func NewMatchingUseCase(repos repository.Repos, notifier IEventNotifier) *MatchingUseCase {
+	return &MatchingUseCase{
+		Users:         repos.User,
+		Games:         repos.Game,
+		MatchingQueue: repos.MatchingQueue,
+		Repos:         repos,
+		Notifier:      notifier,
+	}
 }

@@ -1,4 +1,3 @@
-// HTTP ルート定義Middleware → Controller への振り分けのみ行う
 package router
 
 import (
@@ -13,17 +12,17 @@ import (
 )
 
 type Deps struct {
-	Auth     usecase.AuthDeps
-	Profile  usecase.ProfileDeps
-	Matching usecase.MatchingDeps
-	Game     usecase.GameDeps
-	Ranking  usecase.RankingDeps
-	Admin    usecase.AdminDeps
-	WSAuth   usecase.WSAuthDeps
+	Auth     usecase.IAuthUsecase
+	Profile  usecase.IProfileUsecase
+	Matching usecase.IMatchingUsecase
+	Game     usecase.IGameUsecase
+	Ranking  usecase.IRankingUsecase
+	Admin    usecase.IAdminUsecase
+	WSAuth   usecase.IWSAuthUsecase
 	WS       *infrws.Handler
 	JWT      *infrcrypto.JWTService
 	AuthMW   middleware.AuthConfig
-	Activity middleware.ActivityUpdateConfig // JWT 必須ルートで last_activity_at 更新
+	Activity middleware.ActivityUpdateConfig
 	Cfg      *config.Config
 }
 
@@ -40,7 +39,6 @@ func Register(e *echo.Echo, deps Deps) {
 	api.POST("/auth/login", auth.Login)
 	api.POST("/auth/refresh", auth.Refresh)
 
-	// Auth 通過後: last_activity_at 更新 → AutoLogout 判定の延長
 	protected := api.Group("",
 		middleware.Auth(deps.AuthMW),
 		middleware.ActivityUpdate(deps.Activity),

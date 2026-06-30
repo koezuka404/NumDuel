@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/numduel/numduel/model"
+	"github.com/numduel/numduel/usecase"
 )
 
 const (
@@ -29,12 +29,13 @@ type Store struct {
 }
 
 var (
-	_ model.IJWTRevoker        = (*Store)(nil)
-	_ model.IWSSessionStore    = (*Store)(nil)
-	_ model.IGameLockStore     = (*Store)(nil)
-	_ model.ITurnStore         = (*Store)(nil)
-	_ model.IForceLogoutStore  = (*Store)(nil)
-	_ model.IBackupStatusStore = (*Store)(nil)
+	_ usecase.IJWTRevoker           = (*Store)(nil)
+	_ usecase.IWSSessionStore       = (*Store)(nil)
+	_ usecase.IGameLockStore        = (*Store)(nil)
+	_ usecase.ITurnStore            = (*Store)(nil)
+	_ usecase.IForceLogoutStore     = (*Store)(nil)
+	_ usecase.IBackupStatusStore    = (*Store)(nil)
+	_ usecase.IDistributedLockStore = (*Store)(nil)
 )
 
 func NewStore(rdb *goredis.Client) *Store {
@@ -127,7 +128,7 @@ func (s *Store) DeleteTurn(ctx context.Context, gameID uuid.UUID) error {
 	return s.rdb.Del(ctx, turnKey(gameID)).Err()
 }
 
-func (s *Store) GetTurn(ctx context.Context, gameID uuid.UUID) (*model.TurnInfo, error) {
+func (s *Store) GetTurn(ctx context.Context, gameID uuid.UUID) (*usecase.TurnInfo, error) {
 	val, err := s.rdb.Get(ctx, turnKey(gameID)).Bytes()
 	if err == goredis.Nil {
 		return nil, nil
@@ -143,10 +144,9 @@ func (s *Store) GetTurn(ctx context.Context, gameID uuid.UUID) (*model.TurnInfo,
 	if err != nil {
 		return nil, err
 	}
-	return &model.TurnInfo{
+	return &usecase.TurnInfo{
 		Turn:      p.Turn,
 		PlayerID:  playerID,
-		StartedAt: p.StartedAt.UTC(),
 		ExpiresAt: p.ExpiresAt.UTC(),
 	}, nil
 }
@@ -222,10 +222,10 @@ func (s *Store) SetForceLogoutBefore(ctx context.Context, userID uuid.UUID, t ti
 	return s.rdb.Set(ctx, forceLogoutKey(userID), strconv.FormatInt(t.UTC().Unix(), 10), forceLogoutTTL).Err()
 }
 
-func (s *Store) GetBackupStatus(ctx context.Context) (*model.BackupStatus, error) {
+func (s *Store) GetBackupStatus(ctx context.Context) (*usecase.BackupStatus, error) {
 	val, err := s.rdb.Get(ctx, backupStatusKey()).Bytes()
 	if err == goredis.Nil {
-		return &model.BackupStatus{Status: "ok"}, nil
+		return &usecase.BackupStatus{Status: "ok"}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -237,7 +237,7 @@ func (s *Store) GetBackupStatus(ctx context.Context) (*model.BackupStatus, error
 	if err := json.Unmarshal(val, &raw); err != nil {
 		return nil, err
 	}
-	out := &model.BackupStatus{Status: raw.Status}
+	out := &usecase.BackupStatus{Status: raw.Status}
 	if raw.LastSyncedAt != "" {
 		t, err := time.Parse(time.RFC3339, raw.LastSyncedAt)
 		if err != nil {

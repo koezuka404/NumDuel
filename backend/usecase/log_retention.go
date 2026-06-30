@@ -8,66 +8,69 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
+// ログ保持期間のクリーンアップユースケース。
+type ILogRetentionUsecase interface {
+	Run(ctx context.Context)
+}
+
 const (
-	defaultRetentionBatchSize = 1000
+	defaultRetentionBatchSize  = 1000
 	defaultRetentionBatchSleep = 100 * time.Millisecond
 )
 
-// LogRetentionDeps は LogRetentionWorker / RunLogRetention の依存
-type LogRetentionDeps struct {
-	Repo                     repository.Repos
-	ActivityLogRetentionDays int
-	LoginLogRetentionDays    int
-	WSLogRetentionDays       int
-	BatchSize                int
-	BatchSleep               time.Duration
-	Now                      func() time.Time
+type LogRetentionUseCase struct {
+	ActivityLogs repository.IActivityLogRepo
+	LoginLogs    repository.ILoginLogRepo
+	WSLogs       repository.IWSConnectionLogRepo
+	ActivityDays int
+	LoginDays    int
+	WSDays       int
+	BatchSize    int
+	BatchSleep   time.Duration
+	Now          func() time.Time
 }
 
-// RunLogRetention は保持期限を超えたログをバッチ削除する（§12.7）
-// テーブル単位の失敗は警告ログに記録し、次回 Worker に持ち越す
-func RunLogRetention(ctx context.Context, d LogRetentionDeps) {
-	if d.Repo == nil {
-		return
+func (l *LogRetentionUseCase) now() time.Time {
+	if l != nil && l.Now != nil {
+		return l.Now().UTC()
 	}
-	now := d.now()
-	batchSize := d.BatchSize
+	return time.Now().UTC()
+}
+
+func (l *LogRetentionUseCase) Run(ctx context.Context) {
+	now := l.now()
+	batchSize := l.BatchSize
 	if batchSize <= 0 {
 		batchSize = defaultRetentionBatchSize
 	}
-	sleep := d.BatchSleep
+	sleep := l.BatchSleep
 	if sleep <= 0 {
 		sleep = defaultRetentionBatchSleep
 	}
-
 	type task struct {
 		name   string
 		before time.Time
 		delete func(context.Context, time.Time, int) (int64, error)
 	}
 	var tasks []task
-	if d.ActivityLogRetentionDays > 0 {
-		before := now.AddDate(0, 0, -d.ActivityLogRetentionDays)
+	if l.ActivityDays > 0 {
 		tasks = append(tasks, task{
-			name: "activity_logs", before: before,
-			delete: d.Repo.ActivityLog.DeleteOlderThan,
+			name: "activity_logs", before: now.AddDate(0, 0, -l.ActivityDays),
+			delete: l.ActivityLogs.DeleteOlderThan,
 		})
 	}
-	if d.LoginLogRetentionDays > 0 {
-		before := now.AddDate(0, 0, -d.LoginLogRetentionDays)
+	if l.LoginDays > 0 {
 		tasks = append(tasks, task{
-			name: "login_logs", before: before,
-			delete: d.Repo.LoginLog.DeleteOlderThan,
+			name: "login_logs", before: now.AddDate(0, 0, -l.LoginDays),
+			delete: l.LoginLogs.DeleteOlderThan,
 		})
 	}
-	if d.WSLogRetentionDays > 0 {
-		before := now.AddDate(0, 0, -d.WSLogRetentionDays)
+	if l.WSDays > 0 {
 		tasks = append(tasks, task{
-			name: "ws_connection_logs", before: before,
-			delete: d.Repo.WSConnectionLog.DeleteOlderThan,
+			name: "ws_connection_logs", before: now.AddDate(0, 0, -l.WSDays),
+			delete: l.WSLogs.DeleteOlderThan,
 		})
 	}
-
 	for _, t := range tasks {
 		if err := purgeLogBatches(ctx, t.before, batchSize, sleep, t.delete); err != nil {
 			if err == context.Canceled || err == context.DeadlineExceeded {
@@ -75,6 +78,19 @@ func RunLogRetention(ctx context.Context, d LogRetentionDeps) {
 			}
 			log.Printf("log retention: %s: %v", t.name, err)
 		}
+	}
+}
+
+func NewLogRetentionUseCase(repos repository.Repos, activityDays, loginDays, wsDays, batchSize int, batchSleep time.Duration) *LogRetentionUseCase {
+	return &LogRetentionUseCase{
+		ActivityLogs: repos.ActivityLog,
+		LoginLogs:    repos.LoginLog,
+		WSLogs:       repos.WSConnectionLog,
+		ActivityDays: activityDays,
+		LoginDays:    loginDays,
+		WSDays:       wsDays,
+		BatchSize:    batchSize,
+		BatchSleep:   batchSleep,
 	}
 }
 
@@ -107,11 +123,4 @@ func purgeLogBatches(
 		case <-timer.C:
 		}
 	}
-}
-
-func (d LogRetentionDeps) now() time.Time {
-	if d.Now != nil {
-		return d.Now().UTC()
-	}
-	return time.Now().UTC()
 }

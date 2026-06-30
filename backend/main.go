@@ -19,7 +19,6 @@ import (
 	"github.com/numduel/numduel/db"
 	infrcrypto "github.com/numduel/numduel/crypto"
 	"github.com/numduel/numduel/middleware"
-	"github.com/numduel/numduel/model"
 	infrredis "github.com/numduel/numduel/redis"
 	"github.com/numduel/numduel/repository"
 	"github.com/numduel/numduel/router"
@@ -64,58 +63,55 @@ func main() {
 
 	hub := infrws.NewHub()
 	sessionStore := infrws.NewSessionStore(hub, redisStore)
+	refreshGen := infrcrypto.NewRefreshTokenService()
 
-	authDeps := usecase.AuthDeps{
-		Repo:                   dbSetup.Repos,
-		Passwords:              infrcrypto.NewPasswordService(),
-		AccessTokens:           jwtService,
-		RefreshTokens:          infrcrypto.NewRefreshTokenService(),
-		JWTRevoker:             redisStore,
-		WSSessions:             sessionStore,
-		RefreshTokenExpiryDays: cfg.RefreshTokenExpiryDays,
-	}
-	gameDeps := usecase.GameDeps{
-		Repo: dbSetup.Repos, Secrets: secretHasher,
-		Locks: redisStore, Turns: redisStore, Random: infrcrypto.NewRandomNumberService(), Notifier: hub,
-		TurnDuration: cfg.TurnDuration(), SecretSetup: cfg.SecretSetupDuration(),
-		GameLockTTL: cfg.GameLockTTL(),
-	}
-	matchingDeps := usecase.MatchingDeps{Repo: dbSetup.Repos, Notifier: hub}
-	profileDeps := usecase.ProfileDeps{Repo: dbSetup.Repos}
-	rankingDeps := usecase.RankingDeps{Repo: dbSetup.Repos}
-	adminDeps := usecase.AdminDeps{
-		Repo: dbSetup.Repos, WSSessions: sessionStore,
-		ForceLogout: redisStore, BackupStatus: redisStore,
-		Locks: redisStore, AdminLockTTL: cfg.AdminLockTTL(),
-	}
-	wsAuthDeps := usecase.WSAuthDeps{
-		Repo: dbSetup.Repos, JWT: jwtService,
-		Revoker: redisStore, ForceLogout: redisStore, Notifier: hub,
-	}
+	authUC := usecase.NewAuthUseCase(
+		dbSetup.Repos,
+		infrcrypto.NewPasswordService(),
+		jwtService,
+		refreshGen,
+		redisStore,
+		sessionStore,
+		cfg.RefreshTokenExpiryDays,
+		cfg.RefreshTokenCleanupGraceDays,
+	)
+	gameUC := usecase.NewGameUseCase(
+		dbSetup.Repos, secretHasher, redisStore, redisStore,
+		infrcrypto.NewRandomNumberService(), hub,
+		cfg.TurnDuration(), cfg.SecretSetupDuration(), cfg.GameLockTTL(),
+	)
+	matchingUC := usecase.NewMatchingUseCase(dbSetup.Repos, hub)
+	profileUC := usecase.NewProfileUseCase(dbSetup.Repos)
+	rankingUC := usecase.NewRankingUseCase(dbSetup.Repos, redisStore, cfg.AdminLockTTL())
+	adminUC := usecase.NewAdminUseCase(dbSetup.Repos, rankingUC, sessionStore, redisStore, redisStore, redisStore, cfg.AdminLockTTL())
+	wsAuthUC := usecase.NewWSAuthUseCase(dbSetup.Repos, jwtService, redisStore, redisStore, hub)
+	autoLogoutUC := usecase.NewAutoLogoutUseCase(dbSetup.Repos, redisStore, func(ctx context.Context, userID uuid.UUID) error {
+		return sessionStore.DisconnectWithError(ctx, userID, "unauthorized", "invalid credentials")
+	}, cfg.SessionTimeout())
+	backupUC := usecase.NewBackupUseCase(dbSetup.Syncer, redisStore, 0)
+	logRetentionUC := usecase.NewLogRetentionUseCase(
+		dbSetup.Repos,
+		cfg.ActivityLogRetentionDays,
+		cfg.LoginLogRetentionDays,
+		cfg.WSLogRetentionDays,
+		cfg.RetentionBatchSize,
+		cfg.RetentionBatchSleep(),
+	)
 
 	allowed := make(map[string]struct{}, len(cfg.WSAllowedOrigins))
 	for _, o := range cfg.WSAllowedOrigins {
 		allowed[o] = struct{}{}
 	}
 	wsHandler := &infrws.Handler{
-		Hub: hub, WSAuth: wsAuthDeps, Game: gameDeps,
+		Hub: hub, WSAuth: wsAuthUC, Game: gameUC,
 		Allowed: allowed, Redis: redisStore,
 		JWTMin: cfg.JWTExpiryMinutes,
 	}
 
-	autoLogoutDeps := usecase.AutoLogoutDeps{
-		Repo: dbSetup.Repos, ForceLogout: redisStore,
-		SessionTimeout: cfg.SessionTimeout(),
-		// WS 接続中なら unauthorized を返してから切断
-		ForceDisconnect: func(ctx context.Context, userID uuid.UUID) error {
-			return sessionStore.DisconnectWithError(ctx, userID, model.CodeUnauthorized, "invalid credentials")
-		},
-	}
-
-	if err := usecase.RecoverActiveGames(context.Background(), gameDeps); err != nil {
+	if err := gameUC.RecoverActiveGames(context.Background()); err != nil {
 		log.Printf("recover active games: %v", err)
 	}
-	if err := usecase.SeedMaster(context.Background(), authDeps, usecase.SeedMasterInput{
+	if err := authUC.SeedMaster(context.Background(), usecase.SeedMasterInput{
 		Email: cfg.MasterEmail, Password: cfg.MasterPassword,
 	}); err != nil {
 		log.Printf("seed master: %v", err)
@@ -140,14 +136,13 @@ func main() {
 	})
 
 	router.Register(e, router.Deps{
-		Auth: authDeps, Profile: profileDeps, Matching: matchingDeps, Game: gameDeps,
-		Ranking: rankingDeps, Admin: adminDeps,
-		WSAuth: wsAuthDeps, WS: wsHandler, JWT: jwtService,
+		Auth: authUC, Profile: profileUC, Matching: matchingUC, Game: gameUC,
+		Ranking: rankingUC, Admin: adminUC,
+		WSAuth: wsAuthUC, WS: wsHandler, JWT: jwtService,
 		AuthMW: middleware.AuthConfig{
 			JWT: jwtService, Revoker: redisStore,
 			ForceLogout: redisStore, Repo: dbSetup.Repos,
 		},
-		// protected API ごとに last_activity_at を更新（AutoLogoutWorker 連携）
 		Activity: middleware.ActivityUpdateConfig{Repo: dbSetup.Repos},
 		Cfg: cfg,
 	})
@@ -157,60 +152,43 @@ func main() {
 	if redisStore != nil && cfg.TurnTimeoutPollSeconds > 0 {
 		go (&worker.TurnTimeoutWorker{
 			Store:    redisStore,
-			Game:     gameDeps,
+			Game:     gameUC,
 			Interval: cfg.TurnTimeoutPollInterval(),
 		}).Run(workerCtx)
 	}
 	if cfg.SecretTimeoutPollSeconds > 0 {
 		go (&worker.SecretSetupTimeoutWorker{
-			Game:     gameDeps,
+			Game:     gameUC,
 			Interval: cfg.SecretTimeoutPollInterval(),
 		}).Run(workerCtx)
 	}
 	if redisStore != nil && cfg.AutoLogoutPollSeconds > 0 {
-		// last_activity_at が SESSION_TIMEOUT_MINUTES を超えたユーザーを自動ログアウト
 		go (&worker.AutoLogoutWorker{
-			Deps:     autoLogoutDeps,
-			Interval: cfg.AutoLogoutPollInterval(),
+			AutoLogout: autoLogoutUC,
+			Interval:   cfg.AutoLogoutPollInterval(),
 		}).Run(workerCtx)
 	}
 	if dbSetup.Syncer != nil && redisStore != nil && cfg.BackupCron != "" {
 		go (&worker.BackupWorker{
-			Deps: usecase.BackupDeps{
-				Syncer: dbSetup.Syncer, BackupStatus: redisStore,
-			},
-			Cron: cfg.BackupCron,
+			Backup: backupUC,
+			Cron:   cfg.BackupCron,
 		}).Run(workerCtx)
 	}
 	if cfg.RankingRebuildCron != "" {
 		go (&worker.RankingRebuildWorker{
-			Deps: usecase.RankingRebuildWorkerDeps{
-				Ranking: rankingDeps,
-				Locks:   redisStore,
-				LockTTL: cfg.AdminLockTTL(),
-			},
-			Cron: cfg.RankingRebuildCron,
+			Ranking: rankingUC,
+			Cron:    cfg.RankingRebuildCron,
 		}).Run(workerCtx)
 	}
 	if cfg.LogRetentionCron != "" {
 		go (&worker.LogRetentionWorker{
-			Deps: usecase.LogRetentionDeps{
-				Repo:                     dbSetup.Repos,
-				ActivityLogRetentionDays: cfg.ActivityLogRetentionDays,
-				LoginLogRetentionDays:    cfg.LoginLogRetentionDays,
-				WSLogRetentionDays:       cfg.WSLogRetentionDays,
-				BatchSize:                cfg.RetentionBatchSize,
-				BatchSleep:               cfg.RetentionBatchSleep(),
-			},
-			Cron: cfg.LogRetentionCron,
+			Retention: logRetentionUC,
+			Cron:      cfg.LogRetentionCron,
 		}).Run(workerCtx)
 	}
 	if cfg.RefreshTokenCleanupCron != "" {
 		go (&worker.RefreshTokenCleanupWorker{
-			Deps: usecase.RefreshTokenCleanupDeps{
-				Repo:      dbSetup.Repos,
-				GraceDays: cfg.RefreshTokenCleanupGraceDays,
-			},
+			Auth: authUC,
 			Cron: cfg.RefreshTokenCleanupCron,
 		}).Run(workerCtx)
 	}

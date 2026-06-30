@@ -6,19 +6,17 @@ import (
 	"time"
 
 	infrredis "github.com/numduel/numduel/redis"
-	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/usecase"
 )
 
-// TurnTimeoutWorker は Redis の期限切れターンをポーリングし HandleTimeout を実行する
 type TurnTimeoutWorker struct {
 	Store    *infrredis.Store
-	Game     usecase.GameDeps
+	Game *usecase.GameUseCase
 	Interval time.Duration
 }
 
 func (w *TurnTimeoutWorker) Run(ctx context.Context) {
-	if w.Store == nil || w.Interval <= 0 {
+	if w.Store == nil || w.Game == nil || w.Interval <= 0 {
 		return
 	}
 	ticker := time.NewTicker(w.Interval)
@@ -40,10 +38,8 @@ func (w *TurnTimeoutWorker) tick(ctx context.Context, now time.Time) {
 		return
 	}
 	for _, e := range entries {
-		if err := usecase.HandleTimeout(ctx, w.Game, e.GameID, e.PlayerID); err != nil {
-			if de, ok := model.IsDomainError(err); ok && de.Code == model.CodeInternalError {
-				log.Printf("turn timeout worker: game=%s player=%s: %v", e.GameID, e.PlayerID, err)
-			}
+		if err := w.Game.HandleTimeout(ctx, e.GameID, e.PlayerID); err != nil {
+			log.Printf("turn timeout worker: game=%s player=%s: %v", e.GameID, e.PlayerID, err)
 		}
 	}
 }
