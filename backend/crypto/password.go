@@ -11,7 +11,7 @@ const bcryptCost = 12
 
 type PasswordService struct{}
 
-var _ model.PasswordHasher = (*PasswordService)(nil)
+var _ model.IPasswordHasher = (*PasswordService)(nil)
 
 func NewPasswordService() *PasswordService {
 	return &PasswordService{}

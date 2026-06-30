@@ -43,7 +43,7 @@ func acquireAdminLock(ctx context.Context, d AdminDeps, key string) error {
 	return nil
 }
 
-func acquireRankingRebuildLock(ctx context.Context, locks model.GameLockStore, actorID uuid.UUID, ttl time.Duration) (bool, error) {
+func acquireRankingRebuildLock(ctx context.Context, locks model.IGameLockStore, actorID uuid.UUID, ttl time.Duration) (bool, error) {
 	if locks == nil {
 		return true, nil
 	}

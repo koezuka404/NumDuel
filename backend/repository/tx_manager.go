@@ -18,8 +18,8 @@ type ITxRepos interface {
 	LoginLogs() ILoginLogRepository
 }
 
-// TxManager は複数 DB 更新を 1 トランザクションとして実行する
-type TxManager interface {
+// ITxManager は複数 DB 更新を 1 トランザクションとして実行する
+type ITxManager interface {
 	WithinTx(ctx context.Context, fn func(ctx context.Context, tx ITxRepos) error) error
 }
 
@@ -39,8 +39,8 @@ type gormTxRepos struct {
 	loginLogs      *loginLogRepository
 }
 
-// NewTxManager は TxManager を作成する
-func NewTxManager(database *gorm.DB) TxManager {
+// NewTxManager は ITxManager を作成する
+func NewTxManager(database *gorm.DB) ITxManager {
 	return &GormTxManager{db: database}
 }
 

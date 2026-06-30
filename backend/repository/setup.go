@@ -18,7 +18,7 @@ type SetupResult struct {
 	Primary *DB
 	Backup  *DB
 	Repo    IRepository
-	Tx      TxManager
+	Tx      ITxManager
 	Syncer  *BackupSyncer
 }
 

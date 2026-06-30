@@ -24,7 +24,7 @@ type clientConn struct {
 	conn   *gorillaws.Conn
 }
 
-var _ model.EventNotifier = (*Hub)(nil)
+var _ model.IEventNotifier = (*Hub)(nil)
 
 func NewHub() *Hub {
 	return &Hub{clients: make(map[uuid.UUID]*clientConn)}
@@ -92,12 +92,12 @@ func (h *Hub) SendPong(userID uuid.UUID) {
 // SessionStore は Hub 切断 + Redis キー削除をまとめる
 type SessionStore struct {
 	Hub   *Hub
-	Redis model.WSSessionStore
+	Redis model.IWSSessionStore
 }
 
-var _ model.WSSessionStore = (*SessionStore)(nil)
+var _ model.IWSSessionStore = (*SessionStore)(nil)
 
-func NewSessionStore(hub *Hub, redis model.WSSessionStore) *SessionStore {
+func NewSessionStore(hub *Hub, redis model.IWSSessionStore) *SessionStore {
 	return &SessionStore{Hub: hub, Redis: redis}
 }
 

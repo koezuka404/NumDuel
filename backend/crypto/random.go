@@ -9,7 +9,7 @@ import (
 
 type RandomNumberService struct{}
 
-var _ model.GuessNumberGenerator = (*RandomNumberService)(nil)
+var _ model.IGuessNumberGenerator = (*RandomNumberService)(nil)
 
 func NewRandomNumberService() *RandomNumberService {
 	return &RandomNumberService{}

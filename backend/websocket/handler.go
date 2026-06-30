@@ -21,7 +21,7 @@ type Handler struct {
 	WSAuth  usecase.WSAuthDeps
 	Game    usecase.GameDeps
 	Allowed map[string]struct{}
-	Redis   model.WSSessionStore
+	Redis   model.IWSSessionStore
 	JWTMin  int
 }
 

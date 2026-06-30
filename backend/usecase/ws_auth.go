@@ -14,9 +14,9 @@ import (
 type WSAuthDeps struct {
 	Repo        repository.IRepository
 	JWT         *infrcrypto.JWTService
-	Revoker     model.JWTRevoker
-	ForceLogout model.ForceLogoutStore
-	Notifier    model.EventNotifier
+	Revoker     model.IJWTRevoker
+	ForceLogout model.IForceLogoutStore
+	Notifier    model.IEventNotifier
 	Now         func() time.Time
 }
 

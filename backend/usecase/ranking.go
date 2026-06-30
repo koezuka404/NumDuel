@@ -10,7 +10,7 @@ import (
 
 type RankingDeps struct {
 	Repo repository.IRepository
-	Tx   repository.TxManager
+	Tx   repository.ITxManager
 	Now  func() time.Time
 }
 
@@ -65,7 +65,7 @@ func RebuildRanking(ctx context.Context, d RankingDeps) error {
 // RankingRebuildWorkerDeps は RankingRebuildWorker の依存
 type RankingRebuildWorkerDeps struct {
 	Ranking RankingDeps
-	Locks   model.GameLockStore
+	Locks   model.IGameLockStore
 	LockTTL time.Duration
 }
 

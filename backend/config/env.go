@@ -34,6 +34,8 @@ type Config struct {
 	WSLogRetentionDays         int
 	RetentionBatchSize         int
 	RetentionBatchSleepMs      int
+	RefreshTokenCleanupCron    string
+	RefreshTokenCleanupGraceDays int
 	CORSAllowedOrigins         []string
 	WSAllowedOrigins           []string
 	MasterEmail                string
@@ -70,8 +72,10 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		ActivityLogRetentionDays: envInt(getenv, "ACTIVITY_LOG_RETENTION_DAYS", 90),
 		LoginLogRetentionDays:    envInt(getenv, "LOGIN_LOG_RETENTION_DAYS", 90),
 		WSLogRetentionDays:       envInt(getenv, "WS_LOG_RETENTION_DAYS", 30),
-		RetentionBatchSize:       envInt(getenv, "RETENTION_BATCH_SIZE", 1000),
-		RetentionBatchSleepMs:    envInt(getenv, "RETENTION_BATCH_SLEEP_MS", 100),
+		RetentionBatchSize:           envInt(getenv, "RETENTION_BATCH_SIZE", 1000),
+		RetentionBatchSleepMs:        envInt(getenv, "RETENTION_BATCH_SLEEP_MS", 100),
+		RefreshTokenCleanupCron:      envString(getenv, "REFRESH_TOKEN_CLEANUP_CRON", "0 4 * * *"),
+		RefreshTokenCleanupGraceDays: envInt(getenv, "REFRESH_TOKEN_CLEANUP_GRACE_DAYS", 7),
 		MasterEmail:              getenv("NUMDUEL_MASTER_EMAIL"),
 		MasterPassword:           getenv("NUMDUEL_MASTER_PASSWORD"),
 	}

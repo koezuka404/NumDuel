@@ -14,12 +14,12 @@ import (
 // GameDeps はゲーム系 UseCase の依存関係
 type GameDeps struct {
 	Repo         repository.IRepository
-	Tx           repository.TxManager
-	Secrets      model.SecretHasher
-	Locks        model.GameLockStore
-	Turns        model.TurnStore
-	Random       model.GuessNumberGenerator
-	Notifier     model.EventNotifier
+	Tx           repository.ITxManager
+	Secrets      model.ISecretHasher
+	Locks        model.IGameLockStore
+	Turns        model.ITurnStore
+	Random       model.IGuessNumberGenerator
+	Notifier     model.IEventNotifier
 	TurnDuration time.Duration
 	SecretSetup  time.Duration
 	GameLockTTL  time.Duration

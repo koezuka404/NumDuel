@@ -29,12 +29,12 @@ type Store struct {
 }
 
 var (
-	_ model.JWTRevoker        = (*Store)(nil)
-	_ model.WSSessionStore    = (*Store)(nil)
-	_ model.GameLockStore     = (*Store)(nil)
-	_ model.TurnStore         = (*Store)(nil)
-	_ model.ForceLogoutStore  = (*Store)(nil)
-	_ model.BackupStatusStore = (*Store)(nil)
+	_ model.IJWTRevoker        = (*Store)(nil)
+	_ model.IWSSessionStore    = (*Store)(nil)
+	_ model.IGameLockStore     = (*Store)(nil)
+	_ model.ITurnStore         = (*Store)(nil)
+	_ model.IForceLogoutStore  = (*Store)(nil)
+	_ model.IBackupStatusStore = (*Store)(nil)
 )
 
 func NewStore(rdb *goredis.Client) *Store {

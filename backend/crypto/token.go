@@ -20,7 +20,7 @@ type JWTService struct {
 	expiryMinutes int
 }
 
-var _ model.AccessTokenIssuer = (*JWTService)(nil)
+var _ model.IAccessTokenIssuer = (*JWTService)(nil)
 
 func NewJWTService(secret string, expiryMinutes int) (*JWTService, error) {
 	if len(secret) < 32 {
@@ -101,7 +101,7 @@ func (s *JWTService) Parse(tokenString string) (*AccessToken, error) {
 
 type RefreshTokenService struct{}
 
-var _ model.RefreshTokenGenerator = (*RefreshTokenService)(nil)
+var _ model.IRefreshTokenGenerator = (*RefreshTokenService)(nil)
 
 func NewRefreshTokenService() *RefreshTokenService {
 	return &RefreshTokenService{}

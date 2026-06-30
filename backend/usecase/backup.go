@@ -13,7 +13,7 @@ const defaultBackupMaxRetries = 3
 // BackupDeps は BackupWorker / RunBackupSync の依存
 type BackupDeps struct {
 	Syncer       *repository.BackupSyncer
-	BackupStatus model.BackupStatusStore
+	BackupStatus model.IBackupStatusStore
 	MaxRetries   int
 	Now          func() time.Time
 }

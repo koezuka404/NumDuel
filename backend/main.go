@@ -206,6 +206,15 @@ func main() {
 			Cron: cfg.LogRetentionCron,
 		}).Run(workerCtx)
 	}
+	if cfg.RefreshTokenCleanupCron != "" {
+		go (&worker.RefreshTokenCleanupWorker{
+			Deps: usecase.RefreshTokenCleanupDeps{
+				Repo:      dbSetup.Repo,
+				GraceDays: cfg.RefreshTokenCleanupGraceDays,
+			},
+			Cron: cfg.RefreshTokenCleanupCron,
+		}).Run(workerCtx)
+	}
 
 	go func() {
 		addr := ":" + strconv.Itoa(cfg.Port)

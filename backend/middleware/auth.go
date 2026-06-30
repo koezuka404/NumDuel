@@ -12,8 +12,8 @@ import (
 
 type AuthConfig struct {
 	JWT         *infrcrypto.JWTService
-	Revoker     model.JWTRevoker
-	ForceLogout model.ForceLogoutStore
+	Revoker     model.IJWTRevoker
+	ForceLogout model.IForceLogoutStore
 	Repo        repository.IRepository
 }
 

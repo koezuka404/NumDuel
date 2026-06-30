@@ -14,8 +14,8 @@ import (
 // SESSION_TIMEOUT_MINUTES 分間 last_activity_at が更新されていないユーザーを対象にする
 type AutoLogoutDeps struct {
 	Repo            repository.IRepository
-	Tx              repository.TxManager
-	ForceLogout     model.ForceLogoutStore // Redis user:{userId}:force_logout_before
+	Tx              repository.ITxManager
+	ForceLogout     model.IForceLogoutStore // Redis user:{userId}:force_logout_before
 	ForceDisconnect func(ctx context.Context, userID uuid.UUID) error // WS ERROR 送信後に切断
 	SessionTimeout  time.Duration
 	Now             func() time.Time

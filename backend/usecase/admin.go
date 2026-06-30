@@ -15,11 +15,11 @@ import (
 
 type AdminDeps struct {
 	Repo          repository.IRepository
-	Tx            repository.TxManager
-	WSSessions    model.WSSessionStore
-	ForceLogout   model.ForceLogoutStore
-	BackupStatus  model.BackupStatusStore
-	Locks         model.GameLockStore // admin:{adminId}:*_lock（§13.10.2）
+	Tx            repository.ITxManager
+	WSSessions    model.IWSSessionStore
+	ForceLogout   model.IForceLogoutStore
+	BackupStatus  model.IBackupStatusStore
+	Locks         model.IGameLockStore // admin:{adminId}:*_lock（§13.10.2）
 	AdminLockTTL  time.Duration
 	Now           func() time.Time
 }

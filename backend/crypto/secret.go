@@ -16,7 +16,7 @@ type SecretHashService struct {
 	pepper []byte
 }
 
-var _ model.SecretHasher = (*SecretHashService)(nil)
+var _ model.ISecretHasher = (*SecretHashService)(nil)
 
 func NewSecretHashService(pepper string) (*SecretHashService, error) {
 	if len(pepper) < 32 {

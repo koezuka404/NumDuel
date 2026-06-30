@@ -13,8 +13,8 @@ import (
 // MatchingDeps はマッチング UseCase の依存関係
 type MatchingDeps struct {
 	Repo     repository.IRepository
-	Tx       repository.TxManager
-	Notifier model.EventNotifier
+	Tx       repository.ITxManager
+	Notifier model.IEventNotifier
 	Now      func() time.Time
 }
 
