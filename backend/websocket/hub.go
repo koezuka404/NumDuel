@@ -115,3 +115,8 @@ func (s *SessionStore) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 	}
 	return s.Redis.DeleteUser(ctx, userID)
 }
+
+func (s *SessionStore) DisconnectWithError(ctx context.Context, userID uuid.UUID, code, message string) error {
+	s.Hub.SendError(userID, code, message)
+	return s.DeleteUser(ctx, userID)
+}

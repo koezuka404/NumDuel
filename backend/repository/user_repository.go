@@ -124,3 +124,19 @@ func (r *userRepository) FindUpdatedSince(ctx context.Context, since time.Time) 
 	}
 	return out, nil
 }
+
+func (r *userRepository) ListInactiveSince(ctx context.Context, before time.Time) ([]*model.User, error) {
+	var rows []model.User
+	err := r.db.WithContext(ctx).
+		Where("deleted_at IS NULL AND last_activity_at < ?", before).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.User, len(rows))
+	for i := range rows {
+		row := rows[i]
+		out[i] = &row
+	}
+	return out, nil
+}

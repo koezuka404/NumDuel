@@ -87,6 +87,8 @@ services:
       TURN_TIMEOUT_POLL_SECONDS: "1"
       SECRET_SETUP_SECONDS: "60"
       SECRET_TIMEOUT_POLL_SECONDS: "1"
+      SESSION_TIMEOUT_MINUTES: "5"
+      AUTO_LOGOUT_POLL_SECONDS: "60"
     ports:
       - "8080:8080"
     healthcheck:

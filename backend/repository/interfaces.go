@@ -20,6 +20,7 @@ type IUserRepository interface {
 	List(ctx context.Context, page, limit int) ([]*model.User, int64, error)
 	Search(ctx context.Context, query string, page, limit int) ([]*model.User, int64, error)
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]*model.User, error)
+	ListInactiveSince(ctx context.Context, before time.Time) ([]*model.User, error)
 }
 
 // IGameRepository は games テーブルへのアクセス

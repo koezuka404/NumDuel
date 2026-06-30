@@ -72,6 +72,7 @@ type TurnStore interface {
 // ForceLogoutStore は user:{userId}:force_logout_before の管理
 type ForceLogoutStore interface {
 	GetForceLogoutBefore(ctx context.Context, userID uuid.UUID) (time.Time, error)
+	SetForceLogoutBefore(ctx context.Context, userID uuid.UUID, t time.Time) error
 }
 
 // BackupStatus は backup:status Redis キーの値

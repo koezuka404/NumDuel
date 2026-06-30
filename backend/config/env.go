@@ -23,6 +23,8 @@ type Config struct {
 	TurnTimeoutPollSeconds     int
 	SecretSetupSeconds         int
 	SecretTimeoutPollSeconds   int
+	SessionTimeoutMinutes      int
+	AutoLogoutPollSeconds      int
 	WSAllowedOrigins           []string
 }
 
@@ -47,6 +49,8 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		TurnTimeoutPollSeconds:   envInt(getenv, "TURN_TIMEOUT_POLL_SECONDS", 1),
 		SecretSetupSeconds:       envInt(getenv, "SECRET_SETUP_SECONDS", 60),
 		SecretTimeoutPollSeconds: envInt(getenv, "SECRET_TIMEOUT_POLL_SECONDS", 1),
+		SessionTimeoutMinutes:    envInt(getenv, "SESSION_TIMEOUT_MINUTES", 5),
+		AutoLogoutPollSeconds:    envInt(getenv, "AUTO_LOGOUT_POLL_SECONDS", 60),
 	}
 	if raw := getenv("WS_ALLOWED_ORIGINS"); raw != "" {
 		for _, o := range strings.Split(raw, ",") {
@@ -76,6 +80,9 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	if cfg.GameLockSeconds <= 0 || cfg.TurnDurationSeconds <= 0 || cfg.SecretSetupSeconds <= 0 {
 		return nil, fmt.Errorf("invalid game timing config")
 	}
+	if cfg.SessionTimeoutMinutes <= 0 || cfg.AutoLogoutPollSeconds <= 0 {
+		return nil, fmt.Errorf("invalid session config")
+	}
 	return cfg, nil
 }
 
@@ -97,6 +104,14 @@ func (c *Config) SecretSetupDuration() time.Duration {
 
 func (c *Config) SecretTimeoutPollInterval() time.Duration {
 	return time.Duration(c.SecretTimeoutPollSeconds) * time.Second
+}
+
+func (c *Config) SessionTimeout() time.Duration {
+	return time.Duration(c.SessionTimeoutMinutes) * time.Minute
+}
+
+func (c *Config) AutoLogoutPollInterval() time.Duration {
+	return time.Duration(c.AutoLogoutPollSeconds) * time.Second
 }
 
 func envInt(getenv func(string) string, key string, fallback int) int {

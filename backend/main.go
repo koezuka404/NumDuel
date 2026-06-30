@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/numduel/numduel/db"
 	infrcrypto "github.com/numduel/numduel/crypto"
 	"github.com/numduel/numduel/middleware"
+	"github.com/numduel/numduel/model"
 	infrredis "github.com/numduel/numduel/redis"
 	"github.com/numduel/numduel/repository"
 	"github.com/numduel/numduel/router"
@@ -100,6 +102,14 @@ func main() {
 		JWTMin: cfg.JWTExpiryMinutes, Repo: dbSetup.Repo,
 	}
 
+	autoLogoutDeps := usecase.AutoLogoutDeps{
+		Repo: dbSetup.Repo, Tx: dbSetup.Tx, ForceLogout: redisStore,
+		SessionTimeout: cfg.SessionTimeout(),
+		ForceDisconnect: func(ctx context.Context, userID uuid.UUID) error {
+			return sessionStore.DisconnectWithError(ctx, userID, model.CodeUnauthorized, "invalid credentials")
+		},
+	}
+
 	if err := usecase.RecoverActiveGames(context.Background(), gameDeps); err != nil {
 		log.Printf("recover active games: %v", err)
 	}
@@ -140,6 +150,12 @@ func main() {
 		go (&worker.SecretSetupTimeoutWorker{
 			Game:     gameDeps,
 			Interval: cfg.SecretTimeoutPollInterval(),
+		}).Run(workerCtx)
+	}
+	if redisStore != nil && cfg.AutoLogoutPollSeconds > 0 {
+		go (&worker.AutoLogoutWorker{
+			Deps:     autoLogoutDeps,
+			Interval: cfg.AutoLogoutPollInterval(),
 		}).Run(workerCtx)
 	}
 
