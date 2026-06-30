@@ -2,13 +2,11 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
-	"github.com/numduel/numduel/repository"
 )
 
 // RecoverActiveGames は起動時に進行中ゲームのターン復元と期限切れ WAITING_SECRET の終了を行う
@@ -74,18 +72,4 @@ func recoverInProgressGameTurn(ctx context.Context, d GameDeps, game *model.Game
 		}
 	}
 	return recordRecoverActivityLog(ctx, d.Repo, game.ID, now)
-}
-
-func recordRecoverActivityLog(ctx context.Context, repo repository.IRepository, gameID uuid.UUID, now time.Time) error {
-	detail, err := json.Marshal(map[string]string{"gameId": gameID.String()})
-	if err != nil {
-		return model.ErrInternal("failed to build activity log")
-	}
-	if err := repo.ActivityLogs().Create(ctx, &model.ActivityLog{
-		ID: uuid.New(), LogType: "recover",
-		Detail: detail, CreatedAt: now, UpdatedAt: now,
-	}); err != nil {
-		return model.ErrInternal("failed to save activity log")
-	}
-	return nil
 }

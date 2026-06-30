@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -74,5 +75,10 @@ func shouldSkipRequestLog(c echo.Context) bool {
 	if c.Request().Method == http.MethodOptions {
 		return true
 	}
-	return c.Path() == "/health"
+	path := c.Path()
+	if path == "/health" {
+		return true
+	}
+	// ログ閲覧 API 自体は activity_logs を汚さない
+	return strings.HasPrefix(path, "/api/admin/logs")
 }

@@ -46,6 +46,18 @@ func (r *activityLogRepository) Search(ctx context.Context, logType string, user
 	return out, total, nil
 }
 
+func (r *activityLogRepository) ListDistinctLogTypes(ctx context.Context) ([]string, error) {
+	var types []string
+	err := r.db.WithContext(ctx).Model(&model.ActivityLog{}).
+		Distinct("log_type").Order("log_type ASC").Pluck("log_type", &types).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, len(types))
+	copy(out, types)
+	return out, nil
+}
+
 func (r *activityLogRepository) DeleteOlderThan(ctx context.Context, before time.Time, batchSize int) (int64, error) {
 	res := r.db.WithContext(ctx).
 		Where("created_at < ?", before).

@@ -62,6 +62,7 @@ func Register(e *echo.Echo, deps Deps) {
 	adminGroup.GET("/users/search", admin.SearchUsers)
 	adminGroup.DELETE("/users/:id", admin.DeleteUser)
 	adminGroup.POST("/ranking/rebuild", admin.RebuildRanking)
+	adminGroup.GET("/logs/types", admin.ListLogTypes)
 	adminGroup.GET("/logs", admin.SearchLogs)
 	adminGroup.GET("/logs/download", admin.DownloadLogs)
 	adminGroup.GET("/backup/status", admin.BackupStatus)

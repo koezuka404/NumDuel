@@ -258,6 +258,7 @@ func notifyTurnChanged(ctx context.Context, d GameDeps, game *model.Game) error 
 type guessResultOutput struct {
 	GuessID          uuid.UUID
 	PlayerID         uuid.UUID
+	Turn             int
 	DigitResults     []int
 	HitCount         int
 	IsWin            bool
@@ -317,7 +318,7 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 		}
 		isWin := model.IsWin(results)
 		result = guessResultOutput{
-			GuessID: g.ID, PlayerID: userID,
+			GuessID: g.ID, PlayerID: userID, Turn: g.Turn,
 			DigitResults: model.DigitResultsToInts(g.DigitResults),
 			HitCount:     g.HitCount, IsWin: isWin, IsAuto: isAuto,
 		}
@@ -335,6 +336,10 @@ func SubmitGuess(ctx context.Context, d GameDeps, userID, gameID uuid.UUID, gues
 		}
 		return nil
 	}); err != nil {
+		return err
+	}
+	now := d.now()
+	if err := recordGuessActivityLog(ctx, d.Repo, gameID, userID, result.Turn, result.HitCount, result.IsWin, isAuto, now); err != nil {
 		return err
 	}
 	return notifyGuessResult(ctx, d, gameID, result, finished, winnerID)
@@ -391,6 +396,9 @@ func notifyGuessResult(ctx context.Context, d GameDeps, gameID uuid.UUID, result
 	if finished {
 		if d.Turns != nil {
 			_ = d.Turns.DeleteTurn(ctx, gameID)
+		}
+		if err := recordGameOverActivityLog(ctx, d.Repo, gameID, "guess_win", &winnerID, d.now()); err != nil {
+			return err
 		}
 		over := map[string]any{
 			"gameId": gameID.String(), "reason": "guess_win", "winnerId": winnerID.String(),

@@ -136,6 +136,14 @@ func SearchActivityLogs(ctx context.Context, d AdminDeps, logType string, userID
 	return items, total, nil
 }
 
+func ListActivityLogTypes(ctx context.Context, d AdminDeps) ([]string, error) {
+	types, err := d.Repo.ActivityLogs().ListDistinctLogTypes(ctx)
+	if err != nil {
+		return nil, model.ErrInternal("failed to list log types")
+	}
+	return types, nil
+}
+
 func DownloadActivityLogsCSV(ctx context.Context, d AdminDeps, logType string, userID *uuid.UUID, from, to *time.Time) ([]byte, error) {
 	rows, _, err := d.Repo.ActivityLogs().Search(ctx, logType, userID, from, to, 1, 10000)
 	if err != nil {
@@ -150,7 +158,11 @@ func DownloadActivityLogsCSV(ctx context.Context, d AdminDeps, logType string, u
 			userCol = l.UserID.String()
 		}
 		_ = w.Write([]string{
-			l.ID.String(), userCol, l.LogType, string(l.Detail), l.CreatedAt.UTC().Format(time.RFC3339),
+			sanitizeCSVCell(l.ID.String()),
+			sanitizeCSVCell(userCol),
+			sanitizeCSVCell(l.LogType),
+			sanitizeCSVCell(string(l.Detail)),
+			sanitizeCSVCell(l.CreatedAt.UTC().Format(time.RFC3339)),
 		})
 	}
 	w.Flush()
@@ -158,6 +170,25 @@ func DownloadActivityLogsCSV(ctx context.Context, d AdminDeps, logType string, u
 		return nil, model.ErrInternal("failed to generate csv")
 	}
 	return buf.Bytes(), nil
+}
+
+func RebuildRankingAsAdmin(ctx context.Context, d AdminDeps, adminID uuid.UUID) error {
+	if err := RebuildRanking(ctx, RankingDeps{Repo: d.Repo, Tx: d.Tx, Now: d.Now}); err != nil {
+		return err
+	}
+	return recordAdminRebuildRankingLog(ctx, d.Repo, adminID, d.now())
+}
+
+func sanitizeCSVCell(value string) string {
+	if value == "" {
+		return value
+	}
+	switch value[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + value
+	default:
+		return value
+	}
 }
 
 type BackupStatusOutput struct {
@@ -174,23 +205,6 @@ func GetBackupStatus(ctx context.Context, d AdminDeps) (*BackupStatusOutput, err
 		return nil, model.ErrInternal("failed to read backup status")
 	}
 	return &BackupStatusOutput{LastSyncedAt: st.LastSyncedAt, Status: st.Status}, nil
-}
-
-func recordAdminDeleteUserLog(ctx context.Context, repo repository.IRepository, adminID, targetID uuid.UUID, now time.Time) error {
-	detail, err := json.Marshal(map[string]string{
-		"adminId": adminID.String(), "targetUserId": targetID.String(),
-	})
-	if err != nil {
-		return model.ErrInternal("failed to build activity log")
-	}
-	uid := adminID
-	if err := repo.ActivityLogs().Create(ctx, &model.ActivityLog{
-		ID: uuid.New(), UserID: &uid, LogType: "admin_delete_user",
-		Detail: detail, CreatedAt: now, UpdatedAt: now,
-	}); err != nil {
-		return model.ErrInternal("failed to save activity log")
-	}
-	return nil
 }
 
 func mapAdminUsers(users []*model.User) []AdminUserItem {

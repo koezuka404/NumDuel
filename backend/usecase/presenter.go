@@ -104,6 +104,10 @@ func ActivityLogsResponse(items []ActivityLogItem) []map[string]any {
 	return rows
 }
 
+func LogTypesResponse(types []string) map[string]any {
+	return map[string]any{"logTypes": types}
+}
+
 func BackupStatusResponse(out *BackupStatusOutput) map[string]any {
 	data := map[string]any{"status": out.Status, "lastSyncedAt": nil}
 	if out.LastSyncedAt != nil {

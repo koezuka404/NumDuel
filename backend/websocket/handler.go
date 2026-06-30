@@ -13,18 +13,16 @@ import (
 
 	"github.com/numduel/numduel/middleware"
 	"github.com/numduel/numduel/model"
-	"github.com/numduel/numduel/repository"
 	"github.com/numduel/numduel/usecase"
 )
 
 type Handler struct {
-	Hub      *Hub
-	WSAuth   usecase.WSAuthDeps
-	Game     usecase.GameDeps
-	Allowed  map[string]struct{}
-	Redis    model.WSSessionStore
-	JWTMin   int
-	Repo     repository.IRepository
+	Hub     *Hub
+	WSAuth  usecase.WSAuthDeps
+	Game    usecase.GameDeps
+	Allowed map[string]struct{}
+	Redis   model.WSSessionStore
+	JWTMin  int
 }
 
 type clientMsg struct {
@@ -56,7 +54,7 @@ func (h *Handler) Handle(c echo.Context) error {
 
 	ctx := c.Request().Context()
 	authCh := make(chan struct{}, 1)
-	var userID uuid.UUID
+	var userID, wsLogID uuid.UUID
 	connID := uuid.New().String()
 
 	go func() {
@@ -72,7 +70,7 @@ func (h *Handler) Handle(c echo.Context) error {
 		_, raw, err := conn.ReadMessage()
 		if err != nil {
 			if userID != uuid.Nil {
-				h.onDisconnect(ctx, userID)
+				h.onDisconnect(ctx, userID, wsLogID)
 			}
 			return nil
 		}
@@ -97,15 +95,16 @@ func (h *Handler) Handle(c echo.Context) error {
 				continue
 			}
 			userID = out.UserID
+			wsLogID, err = usecase.RecordWSConnection(ctx, h.WSAuth, userID, connID)
+			if err != nil {
+				h.writeDomainError(conn, err)
+				continue
+			}
 			h.Hub.Register(userID, connID, conn)
 			if h.Redis != nil {
 				ttl := time.Duration(h.JWTMin) * time.Minute
 				_ = h.Redis.SetUser(ctx, userID, connID, ttl)
 			}
-			now := time.Now().UTC()
-			_ = h.Repo.WSConnectionLogs().Create(ctx, &model.WSConnectionLog{
-				ID: uuid.New(), UserID: userID, ConnectionID: connID, ConnectedAt: now,
-			})
 			authCh <- struct{}{}
 			_ = h.writeJSON(conn, map[string]any{
 				"type": "AUTH_OK", "data": map[string]string{"userId": userID.String()},
@@ -116,10 +115,10 @@ func (h *Handler) Handle(c echo.Context) error {
 
 		switch msgType {
 		case "PING":
-			h.touchActivity(ctx, userID)
+			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
 			_ = h.writeJSON(conn, map[string]any{"type": "PONG"})
 		case "SET_SECRET":
-			h.touchActivity(ctx, userID)
+			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
 			gameID, err := uuid.Parse(msg.GameID)
 			if err != nil {
 				h.Hub.SendError(userID, model.CodeValidation, "invalid gameId")
@@ -129,7 +128,7 @@ func (h *Handler) Handle(c echo.Context) error {
 				h.sendDomainError(userID, err)
 			}
 		case "GUESS":
-			h.touchActivity(ctx, userID)
+			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
 			gameID, err := uuid.Parse(msg.GameID)
 			if err != nil {
 				h.Hub.SendError(userID, model.CodeValidation, "invalid gameId")
@@ -139,7 +138,7 @@ func (h *Handler) Handle(c echo.Context) error {
 				h.sendDomainError(userID, err)
 			}
 		case "SYNC_REQUEST":
-			h.touchActivity(ctx, userID)
+			usecase.TouchWSActivity(ctx, h.WSAuth, userID)
 			gameID, err := uuid.Parse(msg.GameID)
 			if err != nil {
 				h.Hub.SendError(userID, model.CodeValidation, "invalid gameId")
@@ -154,33 +153,13 @@ func (h *Handler) Handle(c echo.Context) error {
 	}
 }
 
-func (h *Handler) onDisconnect(ctx context.Context, userID uuid.UUID) {
+func (h *Handler) onDisconnect(ctx context.Context, userID, wsLogID uuid.UUID) {
 	h.Hub.Disconnect(userID)
 	if h.Redis != nil {
 		_ = h.Redis.DeleteUser(ctx, userID)
 	}
-	active, err := usecase.FindActiveGameForUser(ctx, h.Repo, userID)
-	if err != nil || active == nil {
-		return
-	}
-	opponentID, err := active.OpponentID(userID)
-	if err != nil {
-		return
-	}
-	_ = h.Hub.SendToUser(ctx, opponentID, "OPPONENT_STATUS", map[string]any{
-		"gameId": active.ID.String(), "playerId": userID.String(), "connected": false,
-	})
-}
-
-func (h *Handler) touchActivity(ctx context.Context, userID uuid.UUID) {
-	user, err := h.Repo.Users().FindByID(ctx, userID)
-	if err != nil || user == nil || user.IsDeleted() {
-		return
-	}
-	now := time.Now().UTC()
-	user.LastActivityAt = now
-	user.UpdatedAt = now
-	_ = h.Repo.Users().Update(ctx, user)
+	usecase.CloseWSConnectionLog(ctx, h.WSAuth, wsLogID)
+	usecase.NotifyOpponentDisconnected(ctx, h.WSAuth, userID)
 }
 
 func (h *Handler) sendDomainError(userID uuid.UUID, err error) {

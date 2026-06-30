@@ -2,8 +2,6 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -60,21 +58,5 @@ func CancelGameBySecretTimeout(ctx context.Context, d GameDeps, gameID uuid.UUID
 			_ = d.Notifier.SendToUser(ctx, uid, "GAME_OVER", over)
 		}
 	}
-	return recordGameOverActivityLog(ctx, d.Repo, gameID, "secret_setup_timeout", now)
-}
-
-func recordGameOverActivityLog(ctx context.Context, repo repository.IRepository, gameID uuid.UUID, reason string, now time.Time) error {
-	detail, err := json.Marshal(map[string]string{
-		"gameId": gameID.String(), "reason": reason,
-	})
-	if err != nil {
-		return model.ErrInternal("failed to build activity log")
-	}
-	if err := repo.ActivityLogs().Create(ctx, &model.ActivityLog{
-		ID: uuid.New(), LogType: "game_over",
-		Detail: detail, CreatedAt: now, UpdatedAt: now,
-	}); err != nil {
-		return model.ErrInternal("failed to save activity log")
-	}
-	return nil
+	return recordGameOverActivityLog(ctx, d.Repo, gameID, "secret_setup_timeout", nil, now)
 }

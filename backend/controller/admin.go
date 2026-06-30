@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -57,7 +59,11 @@ func (h *AdminController) DeleteUser(c echo.Context) error {
 
 // RebuildRanking POST /api/admin/ranking/rebuild
 func (h *AdminController) RebuildRanking(c echo.Context) error {
-	if err := usecase.RebuildRanking(c.Request().Context(), usecase.RankingDeps{Repo: h.Deps.Repo, Tx: h.Deps.Tx, Now: h.Deps.Now}); err != nil {
+	auth, ok := middleware.AuthFrom(c)
+	if !ok {
+		return dto.WriteError(c, model.ErrUnauthorized())
+	}
+	if err := usecase.RebuildRankingAsAdmin(c.Request().Context(), h.Deps, auth.UserID); err != nil {
 		return dto.WriteError(c, err)
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -85,6 +91,15 @@ func (h *AdminController) SearchLogs(c echo.Context) error {
 	return dto.WritePaged(c, http.StatusOK, usecase.ActivityLogsResponse(items), page, limit, total)
 }
 
+// ListLogTypes GET /api/admin/logs/types
+func (h *AdminController) ListLogTypes(c echo.Context) error {
+	types, err := usecase.ListActivityLogTypes(c.Request().Context(), h.Deps)
+	if err != nil {
+		return dto.WriteError(c, err)
+	}
+	return dto.WriteData(c, http.StatusOK, usecase.LogTypesResponse(types))
+}
+
 // DownloadLogs GET /api/admin/logs/download
 func (h *AdminController) DownloadLogs(c echo.Context) error {
 	userID, err := usecase.ParseOptionalUUID(c.QueryParam("userId"))
@@ -103,7 +118,9 @@ func (h *AdminController) DownloadLogs(c echo.Context) error {
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	c.Response().Header().Set(echo.HeaderContentType, "text/csv")
+	filename := fmt.Sprintf("activity_logs_%s.csv", time.Now().UTC().Format("20060102T150405Z"))
+	c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Response().Header().Set(echo.HeaderContentType, "text/csv; charset=utf-8")
 	return c.Blob(http.StatusOK, "text/csv", csvData)
 }
 

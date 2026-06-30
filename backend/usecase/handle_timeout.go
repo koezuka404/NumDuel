@@ -2,13 +2,10 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/numduel/numduel/model"
-	"github.com/numduel/numduel/repository"
 )
 
 // HandleTimeout はターン期限切れ時に自動予想を 1 回実行する
@@ -96,21 +93,4 @@ func isTimeoutRaceError(err error) bool {
 	default:
 		return false
 	}
-}
-
-func recordTimeoutActivityLog(ctx context.Context, repo repository.IRepository, gameID, playerID uuid.UUID, now time.Time) error {
-	uid := playerID
-	detail, err := json.Marshal(map[string]string{
-		"gameId": gameID.String(), "playerId": playerID.String(),
-	})
-	if err != nil {
-		return model.ErrInternal("failed to build activity log")
-	}
-	if err := repo.ActivityLogs().Create(ctx, &model.ActivityLog{
-		ID: uuid.New(), UserID: &uid, LogType: "timeout",
-		Detail: detail, CreatedAt: now, UpdatedAt: now,
-	}); err != nil {
-		return model.ErrInternal("failed to save activity log")
-	}
-	return nil
 }

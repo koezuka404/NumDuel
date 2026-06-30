@@ -100,7 +100,7 @@ func main() {
 	wsHandler := &infrws.Handler{
 		Hub: hub, WSAuth: wsAuthDeps, Game: gameDeps,
 		Allowed: allowed, Redis: redisStore,
-		JWTMin: cfg.JWTExpiryMinutes, Repo: dbSetup.Repo,
+		JWTMin: cfg.JWTExpiryMinutes,
 	}
 
 	autoLogoutDeps := usecase.AutoLogoutDeps{

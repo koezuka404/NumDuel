@@ -85,6 +85,7 @@ type IRefreshTokenRepository interface {
 type IActivityLogRepository interface {
 	Create(ctx context.Context, log *model.ActivityLog) error
 	Search(ctx context.Context, logType string, userID *uuid.UUID, from, to *time.Time, page, limit int) ([]model.ActivityLog, int64, error)
+	ListDistinctLogTypes(ctx context.Context) ([]string, error)
 	DeleteOlderThan(ctx context.Context, before time.Time, batchSize int) (int64, error)
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]model.ActivityLog, error)
 }
