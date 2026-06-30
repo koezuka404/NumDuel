@@ -90,6 +90,8 @@ services:
       SESSION_TIMEOUT_MINUTES: "5"
       AUTO_LOGOUT_POLL_SECONDS: "60"
       CORS_ALLOWED_ORIGINS: "http://localhost:5173"
+      NUMDUEL_MASTER_EMAIL: "admin@local.test"
+      NUMDUEL_MASTER_PASSWORD: "ChangeMeOnFirstLogin!"
     ports:
       - "8080:8080"
     healthcheck:

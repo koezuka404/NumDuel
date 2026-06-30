@@ -85,7 +85,8 @@ func main() {
 	profileDeps := usecase.ProfileDeps{Repo: dbSetup.Repo}
 	rankingDeps := usecase.RankingDeps{Repo: dbSetup.Repo, Tx: dbSetup.Tx}
 	adminDeps := usecase.AdminDeps{
-		Repo: dbSetup.Repo, Tx: dbSetup.Tx, WSSessions: sessionStore, BackupStatus: redisStore,
+		Repo: dbSetup.Repo, Tx: dbSetup.Tx, WSSessions: sessionStore,
+		ForceLogout: redisStore, BackupStatus: redisStore,
 	}
 	wsAuthDeps := usecase.WSAuthDeps{
 		Repo: dbSetup.Repo, JWT: jwtService,
@@ -113,6 +114,11 @@ func main() {
 
 	if err := usecase.RecoverActiveGames(context.Background(), gameDeps); err != nil {
 		log.Printf("recover active games: %v", err)
+	}
+	if err := usecase.SeedMaster(context.Background(), authDeps, usecase.SeedMasterInput{
+		Email: cfg.MasterEmail, Password: cfg.MasterPassword,
+	}); err != nil {
+		log.Printf("seed master: %v", err)
 	}
 
 	e := echo.New()

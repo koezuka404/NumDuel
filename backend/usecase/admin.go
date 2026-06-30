@@ -17,6 +17,7 @@ type AdminDeps struct {
 	Repo          repository.IRepository
 	Tx            repository.TxManager
 	WSSessions    model.WSSessionStore
+	ForceLogout   model.ForceLogoutStore
 	BackupStatus  model.BackupStatusStore
 	Now           func() time.Time
 }
@@ -57,6 +58,8 @@ func SearchAdminUsers(ctx context.Context, d AdminDeps, query string) ([]AdminUs
 	return mapAdminUsers(users), nil
 }
 
+// DeleteUser は master によるユーザーの論理削除
+// force_logout_before SET → WS 切断 → refresh 失効 → matching キュー削除 → users.deleted_at 更新 → activity_logs
 func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) error {
 	if adminID == targetID {
 		return model.ErrCannotDeleteSelf()
@@ -82,10 +85,15 @@ func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) e
 		return model.ErrUserInActiveGame()
 	}
 	now := d.now()
+	if d.ForceLogout != nil {
+		if err := d.ForceLogout.SetForceLogoutBefore(ctx, targetID, now); err != nil {
+			return model.ErrInternal("failed to set force logout")
+		}
+	}
 	if d.WSSessions != nil {
 		_ = d.WSSessions.DeleteUser(ctx, targetID)
 	}
-	return d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
+	if err := d.Tx.WithinTx(ctx, func(ctx context.Context, tx repository.ITxRepos) error {
 		if err := revokeRefreshTokensByUserID(ctx, tx, targetID, now); err != nil {
 			return model.ErrInternal("failed to revoke refresh tokens")
 		}
@@ -99,7 +107,10 @@ func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) e
 			return model.ErrInternal("failed to delete user")
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return recordAdminDeleteUserLog(ctx, d.Repo, adminID, targetID, now)
 }
 
 type ActivityLogItem struct {
@@ -163,6 +174,23 @@ func GetBackupStatus(ctx context.Context, d AdminDeps) (*BackupStatusOutput, err
 		return nil, model.ErrInternal("failed to read backup status")
 	}
 	return &BackupStatusOutput{LastSyncedAt: st.LastSyncedAt, Status: st.Status}, nil
+}
+
+func recordAdminDeleteUserLog(ctx context.Context, repo repository.IRepository, adminID, targetID uuid.UUID, now time.Time) error {
+	detail, err := json.Marshal(map[string]string{
+		"adminId": adminID.String(), "targetUserId": targetID.String(),
+	})
+	if err != nil {
+		return model.ErrInternal("failed to build activity log")
+	}
+	uid := adminID
+	if err := repo.ActivityLogs().Create(ctx, &model.ActivityLog{
+		ID: uuid.New(), UserID: &uid, LogType: "admin_delete_user",
+		Detail: detail, CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		return model.ErrInternal("failed to save activity log")
+	}
+	return nil
 }
 
 func mapAdminUsers(users []*model.User) []AdminUserItem {

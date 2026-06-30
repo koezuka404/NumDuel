@@ -27,6 +27,8 @@ type Config struct {
 	AutoLogoutPollSeconds      int // AutoLogoutWorker のポーリング間隔秒（デフォルト 60）
 	CORSAllowedOrigins         []string
 	WSAllowedOrigins           []string
+	MasterEmail                string
+	MasterPassword             string
 }
 
 // Load は os.Getenv から設定を読み込む
@@ -52,6 +54,8 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		SecretTimeoutPollSeconds: envInt(getenv, "SECRET_TIMEOUT_POLL_SECONDS", 1),
 		SessionTimeoutMinutes:    envInt(getenv, "SESSION_TIMEOUT_MINUTES", 5),
 		AutoLogoutPollSeconds:    envInt(getenv, "AUTO_LOGOUT_POLL_SECONDS", 60),
+		MasterEmail:              getenv("NUMDUEL_MASTER_EMAIL"),
+		MasterPassword:           getenv("NUMDUEL_MASTER_PASSWORD"),
 	}
 	if raw := getenv("CORS_ALLOWED_ORIGINS"); raw != "" {
 		for _, o := range strings.Split(raw, ",") {

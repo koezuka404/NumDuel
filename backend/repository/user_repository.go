@@ -153,3 +153,15 @@ func (r *userRepository) TouchLastActivity(ctx context.Context, userID uuid.UUID
 		})
 	return res.Error
 }
+
+// ExistsActiveMaster は未削除の master ユーザーが存在するか
+func (r *userRepository) ExistsActiveMaster(ctx context.Context) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("role = ? AND deleted_at IS NULL", model.RoleMaster).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
