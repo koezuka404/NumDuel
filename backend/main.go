@@ -116,7 +116,10 @@ func main() {
 	}
 
 	e := echo.New()
-	e.Use(middleware.CORS(cfg.CORSAllowedOrigins))
+	e.Use(
+		middleware.Recover(),
+		middleware.CORS(cfg.CORSAllowedOrigins),
+	)
 	e.GET("/health", func(c echo.Context) error {
 		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
 		defer cancel()
