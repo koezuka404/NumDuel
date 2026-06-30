@@ -10,6 +10,9 @@ import (
 	"github.com/numduel/numduel/model"
 )
 
+// rankingRebuildWorkerActorID は RankingRebuildWorker 用 admin ロックの actor ID
+var rankingRebuildWorkerActorID = uuid.MustParse("00000000-0000-0000-0000-000000000000")
+
 func adminRankingRebuildLockKey(adminID uuid.UUID) string {
 	return fmt.Sprintf("admin:%s:ranking_rebuild_lock", adminID)
 }
@@ -38,4 +41,14 @@ func acquireAdminLock(ctx context.Context, d AdminDeps, key string) error {
 		return model.ErrRateLimitExceeded()
 	}
 	return nil
+}
+
+func acquireRankingRebuildLock(ctx context.Context, locks model.GameLockStore, actorID uuid.UUID, ttl time.Duration) (bool, error) {
+	if locks == nil {
+		return true, nil
+	}
+	if ttl <= 0 {
+		ttl = 5 * time.Second
+	}
+	return locks.AcquireLock(ctx, adminRankingRebuildLockKey(actorID), ttl)
 }

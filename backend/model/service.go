@@ -81,9 +81,10 @@ type BackupStatus struct {
 	Status       string // ok / error
 }
 
-// BackupStatusStore はバックアップ同期状態の参照
+// BackupStatusStore は backup:status Redis キーの読み書き
 type BackupStatusStore interface {
 	GetBackupStatus(ctx context.Context) (*BackupStatus, error)
+	SetBackupStatus(ctx context.Context, status string, lastSyncedAt time.Time) error
 }
 
 // EventNotifier は DB コミット後の WebSocket 通知用（現状 no-op 実装）

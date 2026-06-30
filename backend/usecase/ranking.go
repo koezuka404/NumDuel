@@ -61,3 +61,22 @@ func RebuildRanking(ctx context.Context, d RankingDeps) error {
 		return nil
 	})
 }
+
+// RankingRebuildWorkerDeps は RankingRebuildWorker の依存
+type RankingRebuildWorkerDeps struct {
+	Ranking RankingDeps
+	Locks   model.GameLockStore
+	LockTTL time.Duration
+}
+
+// RunScheduledRankingRebuild は cron から rankings を再集計する（§12.6）
+func RunScheduledRankingRebuild(ctx context.Context, d RankingRebuildWorkerDeps) error {
+	ok, err := acquireRankingRebuildLock(ctx, d.Locks, rankingRebuildWorkerActorID, d.LockTTL)
+	if err != nil {
+		return model.ErrInternal("failed to acquire ranking rebuild lock")
+	}
+	if !ok {
+		return nil
+	}
+	return RebuildRanking(ctx, d.Ranking)
+}

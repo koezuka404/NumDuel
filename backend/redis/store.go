@@ -254,14 +254,15 @@ func (s *Store) GetBackupStatus(ctx context.Context) (*model.BackupStatus, error
 
 // SetBackupStatus は BackupWorker 成功/失敗時に更新する
 func (s *Store) SetBackupStatus(ctx context.Context, status string, lastSyncedAt time.Time) error {
-	payload, err := json.Marshal(map[string]string{
-		"status":       status,
-		"lastSyncedAt": lastSyncedAt.UTC().Format(time.RFC3339),
-	})
+	payload := map[string]string{"status": status}
+	if !lastSyncedAt.IsZero() {
+		payload["lastSyncedAt"] = lastSyncedAt.UTC().Format(time.RFC3339)
+	}
+	raw, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	return s.rdb.Set(ctx, backupStatusKey(), payload, 0).Err()
+	return s.rdb.Set(ctx, backupStatusKey(), raw, 0).Err()
 }
 
 func jwtRevokedKey(jti string) string {

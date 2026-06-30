@@ -26,6 +26,14 @@ type Config struct {
 	SecretTimeoutPollSeconds   int
 	SessionTimeoutMinutes      int // 無操作とみなす分数（デフォルト 5）
 	AutoLogoutPollSeconds      int // AutoLogoutWorker のポーリング間隔秒（デフォルト 60）
+	BackupCron                 string // BackupWorker スケジュール（§12.8、既定 03:00 UTC）
+	RankingRebuildCron         string // RankingRebuildWorker スケジュール（§12.6、既定 10分毎 UTC）
+	LogRetentionCron           string // LogRetentionWorker スケジュール（§12.7、既定 日曜 03:30 UTC）
+	ActivityLogRetentionDays   int
+	LoginLogRetentionDays      int
+	WSLogRetentionDays         int
+	RetentionBatchSize         int
+	RetentionBatchSleepMs      int
 	CORSAllowedOrigins         []string
 	WSAllowedOrigins           []string
 	MasterEmail                string
@@ -56,6 +64,14 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		SecretTimeoutPollSeconds: envInt(getenv, "SECRET_TIMEOUT_POLL_SECONDS", 1),
 		SessionTimeoutMinutes:    envInt(getenv, "SESSION_TIMEOUT_MINUTES", 5),
 		AutoLogoutPollSeconds:    envInt(getenv, "AUTO_LOGOUT_POLL_SECONDS", 60),
+		BackupCron:               envString(getenv, "BACKUP_CRON", "0 3 * * *"),
+		RankingRebuildCron:       envString(getenv, "RANKING_REBUILD_CRON", "*/10 * * * *"),
+		LogRetentionCron:         envString(getenv, "LOG_RETENTION_CRON", "30 3 * * 0"),
+		ActivityLogRetentionDays: envInt(getenv, "ACTIVITY_LOG_RETENTION_DAYS", 90),
+		LoginLogRetentionDays:    envInt(getenv, "LOGIN_LOG_RETENTION_DAYS", 90),
+		WSLogRetentionDays:       envInt(getenv, "WS_LOG_RETENTION_DAYS", 30),
+		RetentionBatchSize:       envInt(getenv, "RETENTION_BATCH_SIZE", 1000),
+		RetentionBatchSleepMs:    envInt(getenv, "RETENTION_BATCH_SLEEP_MS", 100),
 		MasterEmail:              getenv("NUMDUEL_MASTER_EMAIL"),
 		MasterPassword:           getenv("NUMDUEL_MASTER_PASSWORD"),
 	}
@@ -132,6 +148,10 @@ func (c *Config) AutoLogoutPollInterval() time.Duration {
 	return time.Duration(c.AutoLogoutPollSeconds) * time.Second
 }
 
+func (c *Config) RetentionBatchSleep() time.Duration {
+	return time.Duration(c.RetentionBatchSleepMs) * time.Millisecond
+}
+
 func envInt(getenv func(string) string, key string, fallback int) int {
 	raw := getenv(key)
 	if raw == "" {
@@ -154,4 +174,12 @@ func envBool(getenv func(string) string, key string, fallback bool) bool {
 		return fallback
 	}
 	return v
+}
+
+func envString(getenv func(string) string, key, fallback string) string {
+	raw := getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	return raw
 }

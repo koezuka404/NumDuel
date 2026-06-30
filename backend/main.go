@@ -175,6 +175,37 @@ func main() {
 			Interval: cfg.AutoLogoutPollInterval(),
 		}).Run(workerCtx)
 	}
+	if dbSetup.Syncer != nil && redisStore != nil && cfg.BackupCron != "" {
+		go (&worker.BackupWorker{
+			Deps: usecase.BackupDeps{
+				Syncer: dbSetup.Syncer, BackupStatus: redisStore,
+			},
+			Cron: cfg.BackupCron,
+		}).Run(workerCtx)
+	}
+	if cfg.RankingRebuildCron != "" {
+		go (&worker.RankingRebuildWorker{
+			Deps: usecase.RankingRebuildWorkerDeps{
+				Ranking: rankingDeps,
+				Locks:   redisStore,
+				LockTTL: cfg.AdminLockTTL(),
+			},
+			Cron: cfg.RankingRebuildCron,
+		}).Run(workerCtx)
+	}
+	if cfg.LogRetentionCron != "" {
+		go (&worker.LogRetentionWorker{
+			Deps: usecase.LogRetentionDeps{
+				Repo:                     dbSetup.Repo,
+				ActivityLogRetentionDays: cfg.ActivityLogRetentionDays,
+				LoginLogRetentionDays:    cfg.LoginLogRetentionDays,
+				WSLogRetentionDays:       cfg.WSLogRetentionDays,
+				BatchSize:                cfg.RetentionBatchSize,
+				BatchSleep:               cfg.RetentionBatchSleep(),
+			},
+			Cron: cfg.LogRetentionCron,
+		}).Run(workerCtx)
+	}
 
 	go func() {
 		addr := ":" + strconv.Itoa(cfg.Port)
