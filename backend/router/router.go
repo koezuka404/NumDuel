@@ -35,7 +35,7 @@ func Register(e *echo.Echo, deps Deps) {
 	ranking := controller.NewRankingController(deps.Ranking)
 	admin := controller.NewAdminController(deps.Admin)
 
-	api := e.Group("/api")
+	api := e.Group("/api", middleware.RateLimit())
 	api.POST("/auth/register", auth.Register)
 	api.POST("/auth/login", auth.Login)
 	api.POST("/auth/refresh", auth.Refresh)

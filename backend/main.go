@@ -116,6 +116,7 @@ func main() {
 	}
 
 	e := echo.New()
+	// Recover → CORS → RequestLog（global）/api 配下は RateLimit → Auth → ActivityUpdate → Admin
 	e.Use(
 		middleware.Recover(),
 		middleware.CORS(cfg.CORSAllowedOrigins),
