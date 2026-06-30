@@ -119,6 +119,7 @@ func main() {
 	e.Use(
 		middleware.Recover(),
 		middleware.CORS(cfg.CORSAllowedOrigins),
+		middleware.RequestLog(middleware.RequestLogConfig{Repo: dbSetup.Repo}),
 	)
 	e.GET("/health", func(c echo.Context) error {
 		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
