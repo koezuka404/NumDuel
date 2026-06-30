@@ -1,4 +1,4 @@
-// CORS_ALLOWED_ORIGINS で許可するオリジンのみ API へ credentials 付きアクセスを許可
+//CORS_ALLOWED_ORIGINSで許可するオリジンのみAPIへcredentials付きアクセスを許可
 package middleware
 
 import (
@@ -8,8 +8,8 @@ import (
 	echomw "github.com/labstack/echo/v4/middleware"
 )
 
-// CORS はフロントからの Cookie 付き API 呼び出し向け CORS ヘッダを付与する
-// origins 空なら no-op（ローカル直叩き用。WS は WS_ALLOWED_ORIGINS で別管理）
+//CORSはフロントからのCookie付きAPI呼び出し向けCORSヘッダを付与する
+//origins空ならno-op（ローカル直叩き用。WSはWS_ALLOWED_ORIGINSで別管理）
 func CORS(origins []string) echo.MiddlewareFunc {
 	if len(origins) == 0 {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {

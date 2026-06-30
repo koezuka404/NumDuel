@@ -1,4 +1,4 @@
-// Middleware が検証した JWT 情報を Controller へ渡すためのコンテキスト保持
+//Middlewareが検証したJWT情報をControllerへ渡すためのコンテキスト保持
 package middleware
 
 import (
@@ -10,11 +10,11 @@ import (
 	"github.com/numduel/numduel/model"
 )
 
-// AuthInfo は JWT から取り出した認証情報
+//AuthInfoはJWTから取り出した認証情報
 type AuthInfo struct {
 	UserID    uuid.UUID
 	Role      model.Role
-	JTI       string // JWT ID（失効管理用）
+	JTI       string //JWTID（失効管理用）
 	ExpiresAt time.Time
 }
 

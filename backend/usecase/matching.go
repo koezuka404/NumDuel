@@ -10,7 +10,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// マッチングキューのユースケース。
+//マッチングキューのユースケース。
 type IMatchingUsecase interface {
 	Start(ctx context.Context, userID uuid.UUID) (*StartMatchingOutput, error)
 	Cancel(ctx context.Context, userID uuid.UUID) (*CancelMatchingOutput, error)

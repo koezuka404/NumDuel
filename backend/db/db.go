@@ -64,7 +64,7 @@ func durationFromEnv(key string, fallback time.Duration) time.Duration {
 	return d
 }
 
-// Open は DATABASE_URL（dsn）から PostgreSQL に接続し、接続プールを設定する
+//OpenはDATABASE_URL（dsn）からPostgreSQLに接続し、接続プールを設定する
 func Open(dsn string) (*gorm.DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("DATABASE_URL is empty")
@@ -81,7 +81,7 @@ func Open(dsn string) (*gorm.DB, error) {
 	return gdb, nil
 }
 
-// Ping は PostgreSQL への疎通確認を行う
+//PingはPostgreSQLへの疎通確認を行う
 func Ping(ctx context.Context, gdb *gorm.DB) error {
 	sqlDB, err := sqlDBFromGorm(gdb)
 	if err != nil {
@@ -90,7 +90,7 @@ func Ping(ctx context.Context, gdb *gorm.DB) error {
 	return sqlDB.PingContext(ctx)
 }
 
-// SQLDB は GORM から database/sql ハンドルを返す
+//SQLDBはGORMからdatabase/sqlハンドルを返す
 func SQLDB(gdb *gorm.DB) (*sql.DB, error) {
 	return sqlDBFromGorm(gdb)
 }

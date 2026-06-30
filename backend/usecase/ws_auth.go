@@ -10,12 +10,12 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// AccessToken 解析。
+//AccessToken解析。
 type IAccessTokenParser interface {
 	Parse(raw string) (*AccessTokenClaims, error)
 }
 
-// WebSocket 接続認証ユースケース。
+//WebSocket接続認証ユースケース。
 type IWSAuthUsecase interface {
 	Authenticate(ctx context.Context, token string) (*WSAuthOutput, error)
 	NotifyOpponentConnected(ctx context.Context, userID uuid.UUID)

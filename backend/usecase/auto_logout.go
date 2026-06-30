@@ -11,7 +11,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// 非アクティブユーザーの自動ログアウトユースケース。
+//非アクティブユーザーの自動ログアウトユースケース。
 type IAutoLogoutUsecase interface {
 	Run(ctx context.Context) error
 }

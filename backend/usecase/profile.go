@@ -10,7 +10,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// プロフィール・履歴取得ユースケース。
+//プロフィール・履歴取得ユースケース。
 type IProfileUsecase interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*GetProfileOutput, error)
 	GetMatchHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]MatchHistoryItem, int64, error)

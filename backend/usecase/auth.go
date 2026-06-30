@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Register / Login / Refresh / Logout / Me を扱う認証ユースケース。
+//Register/Login/Refresh/Logout/Meを扱う認証ユースケース。
 type IAuthUsecase interface {
 	Register(ctx context.Context, in RegisterInput) (*RegisterResult, error)
 	Login(ctx context.Context, in LoginInput) (*LoginResult, error)
@@ -22,13 +22,13 @@ type IAuthUsecase interface {
 	CleanupExpiredRefreshTokens(ctx context.Context)
 }
 
-// パスワードの hash 化と照合。
+//パスワードのhash化と照合。
 type IPasswordHasher interface {
 	Hash(password string) (string, error)
 	Verify(hash, password string) bool
 }
 
-// AccessToken 発行。
+//AccessToken発行。
 type IAccessTokenIssuer interface {
 	Issue(userID uuid.UUID, role model.Role, now time.Time) (string, error)
 }
@@ -38,7 +38,7 @@ type RefreshTokenPair struct {
 	Hash      string
 }
 
-// RefreshToken 生成と hash 化。
+//RefreshToken生成とhash化。
 type IRefreshTokenGenerator interface {
 	Generate() (RefreshTokenPair, error)
 	Hash(plaintext string) string
@@ -52,19 +52,19 @@ type AccessTokenClaims struct {
 	ExpiresAt time.Time
 }
 
-// JWT 失効管理。
+//JWT失効管理。
 type IJWTRevoker interface {
 	Revoke(ctx context.Context, jti string, ttl time.Duration) error
 	IsRevoked(ctx context.Context, jti string) (bool, error)
 }
 
-// WebSocket セッションの Redis 管理。
+//WebSocketセッションのRedis管理。
 type IWSSessionStore interface {
 	SetUser(ctx context.Context, userID uuid.UUID, connectionID string, ttl time.Duration) error
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
 }
 
-// 強制ログアウト時刻の Redis 管理。
+//強制ログアウト時刻のRedis管理。
 type IForceLogoutStore interface {
 	SetForceLogoutBefore(ctx context.Context, userID uuid.UUID, at time.Time) error
 	GetForceLogoutBefore(ctx context.Context, userID uuid.UUID) (time.Time, error)

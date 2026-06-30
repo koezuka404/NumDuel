@@ -1,4 +1,4 @@
-// WebSocket Hub: 接続管理と Server → Client 通知
+//WebSocketHub:接続管理とServer→Client通知
 package websocket
 
 import (
@@ -89,7 +89,7 @@ func (h *Hub) SendPong(userID uuid.UUID) {
 	_ = h.SendRaw(userID, map[string]any{"type": "PONG"})
 }
 
-// SessionStore は Hub 切断 + Redis キー削除をまとめる
+//SessionStoreはHub切断+Redisキー削除をまとめる
 type SessionStore struct {
 	Hub   *Hub
 	Redis usecase.IWSSessionStore
@@ -116,7 +116,7 @@ func (s *SessionStore) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 	return s.Redis.DeleteUser(ctx, userID)
 }
 
-// DisconnectWithError は AutoLogout 向け ERROR 送信後に WS 切断 + Redis ws:user 削除
+//DisconnectWithErrorはAutoLogout向けERROR送信後にWS切断+Redisws:user削除
 func (s *SessionStore) DisconnectWithError(ctx context.Context, userID uuid.UUID, code, message string) error {
 	s.Hub.SendError(userID, code, message)
 	return s.DeleteUser(ctx, userID)

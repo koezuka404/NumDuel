@@ -1,4 +1,4 @@
-// 環境変数の読み込みと起動時バリデーション
+//環境変数の読み込みと起動時バリデーション
 package config
 
 import (
@@ -19,16 +19,16 @@ type Config struct {
 	CookieSecure           bool
 	GameSecretPepper       string
 	GameLockSeconds        int
-	AdminLockSeconds       int // 管理操作 Redis ロック TTL（§13.10.2、既定 5）
+	AdminLockSeconds       int //管理操作RedisロックTTL（§13.10.2、既定5）
 	TurnDurationSeconds        int
 	TurnTimeoutPollSeconds     int
 	SecretSetupSeconds         int
 	SecretTimeoutPollSeconds   int
-	SessionTimeoutMinutes      int // 無操作とみなす分数（デフォルト 5）
-	AutoLogoutPollSeconds      int // AutoLogoutWorker のポーリング間隔秒（デフォルト 60）
-	BackupCron                 string // BackupWorker スケジュール（§12.8、既定 03:00 UTC）
-	RankingRebuildCron         string // RankingRebuildWorker スケジュール（§12.6、既定 10分毎 UTC）
-	LogRetentionCron           string // LogRetentionWorker スケジュール（§12.7、既定 日曜 03:30 UTC）
+	SessionTimeoutMinutes      int //無操作とみなす分数（デフォルト5）
+	AutoLogoutPollSeconds      int //AutoLogoutWorkerのポーリング間隔秒（デフォルト60）
+	BackupCron                 string //BackupWorkerスケジュール（§12.8、既定03:00UTC）
+	RankingRebuildCron         string //RankingRebuildWorkerスケジュール（§12.6、既定10分毎UTC）
+	LogRetentionCron           string //LogRetentionWorkerスケジュール（§12.7、既定日曜03:30UTC）
 	ActivityLogRetentionDays   int
 	LoginLogRetentionDays      int
 	WSLogRetentionDays         int
@@ -42,12 +42,12 @@ type Config struct {
 	MasterPassword             string
 }
 
-// Load は os.Getenv から設定を読み込む
+//Loadはos.Getenvから設定を読み込む
 func Load() (*Config, error) {
 	return LoadFromEnv(os.Getenv)
 }
 
-// LoadFromEnv は getenv から設定を読み込む（テスト用に注入可能）
+//LoadFromEnvはgetenvから設定を読み込む（テスト用に注入可能）
 func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	cfg := &Config{
 		DatabaseURL:            getenv("DATABASE_URL"),

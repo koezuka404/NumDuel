@@ -8,7 +8,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// ログ保持期間のクリーンアップユースケース。
+//ログ保持期間のクリーンアップユースケース。
 type ILogRetentionUsecase interface {
 	Run(ctx context.Context)
 }

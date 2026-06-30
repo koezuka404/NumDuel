@@ -1,4 +1,4 @@
-// 全 API リクエストを activity_logs に記録（パスワード・JWT 本文は含めない）
+//全APIリクエストをactivity_logsに記録（パスワード・JWT本文は含めない）
 package middleware
 
 import (
@@ -16,13 +16,13 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// RequestLogConfig は RequestLog の依存関係
+//RequestLogConfigはRequestLogの依存関係
 type RequestLogConfig struct {
 	Repo repository.Repos
 }
 
-// RequestLog は HTTP メタデータを activity_logs（log_type: http_request）へ非同期 INSERT する
-// /health と OPTIONS は記録しない。login/register 等もリクエスト本文は保存しない
+//RequestLogはHTTPメタデータをactivity_logs（log_type:http_request）へ非同期INSERTする
+///healthとOPTIONSは記録しない。login/register等もリクエスト本文は保存しない
 func RequestLog(cfg RequestLogConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -79,6 +79,6 @@ func shouldSkipRequestLog(c echo.Context) bool {
 	if path == "/health" {
 		return true
 	}
-	// ログ閲覧 API 自体は activity_logs を汚さない
+	//ログ閲覧API自体はactivity_logsを汚さない
 	return strings.HasPrefix(path, "/api/admin/logs")
 }

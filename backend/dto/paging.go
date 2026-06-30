@@ -10,7 +10,7 @@ const defaultPage = 1
 const defaultLimit = 20
 const maxLimit = 100
 
-// ParsePageLimit は page / limit クエリを正規化する
+//ParsePageLimitはpage/limitクエリを正規化する
 func ParsePageLimit(c echo.Context) (page, limit int) {
 	page = defaultPage
 	limit = defaultLimit

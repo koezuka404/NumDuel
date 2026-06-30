@@ -1,4 +1,4 @@
-// JWT 必須 API で users.last_activity_at を更新する（AutoLogoutWorker 用）
+//JWT必須APIでusers.last_activity_atを更新する（AutoLogoutWorker用）
 package middleware
 
 import (
@@ -9,21 +9,21 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// ActivityUpdateConfig は ActivityUpdate の依存関係
-// Auth 通過後の protected ルートでのみ last_activity_at を更新する
+//ActivityUpdateConfigはActivityUpdateの依存関係
+//Auth通過後のprotectedルートでのみlast_activity_atを更新する
 type ActivityUpdateConfig struct {
 	Repo repository.Repos
 }
 
-// ActivityUpdate は認証済みリクエスト処理後に last_activity_at を now に更新する
-// AutoLogoutWorker が SESSION_TIMEOUT_MINUTES 超過を判定するため HTTP 操作もセッション継続扱いにする
-// login / refresh / logout / WS は各 UseCase・Handler 側でも更新する
-// 更新失敗時もハンドラのレスポンスはそのまま返す
+//ActivityUpdateは認証済みリクエスト処理後にlast_activity_atをnowに更新する
+//AutoLogoutWorkerがSESSION_TIMEOUT_MINUTES超過を判定するためHTTP操作もセッション継続扱いにする
+//login/refresh/logout/WSは各UseCase・Handler側でも更新する
+//更新失敗時もハンドラのレスポンスはそのまま返す
 func ActivityUpdate(cfg ActivityUpdateConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			err := next(c)
-			// Auth Middleware が SetAuth した場合のみ更新（register/login/refresh は対象外）
+			//AuthMiddlewareがSetAuthした場合のみ更新（register/login/refreshは対象外）
 			auth, ok := AuthFrom(c)
 			if !ok || cfg.Repo.User == nil {
 				return err

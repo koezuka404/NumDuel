@@ -11,12 +11,12 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// 分散ロック（ランキング再構築・管理操作）。
+//分散ロック（ランキング再構築・管理操作）。
 type IDistributedLockStore interface {
 	AcquireLock(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
-// ランキング取得・再構築ユースケース。
+//ランキング取得・再構築ユースケース。
 type IRankingUsecase interface {
 	Get(ctx context.Context) ([]RankingItem, error)
 	Rebuild(ctx context.Context) error

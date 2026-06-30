@@ -1,4 +1,4 @@
-// API 共通の JSON レスポンス形式を提供する
+//API共通のJSONレスポンス形式を提供する
 package dto
 
 import (

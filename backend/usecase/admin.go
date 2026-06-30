@@ -14,7 +14,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// 管理画面ユースケース。
+//管理画面ユースケース。
 type IAdminUsecase interface {
 	ListUsers(ctx context.Context, page, limit int) ([]AdminUserItem, int64, error)
 	SearchUsers(ctx context.Context, query string) ([]AdminUserItem, error)

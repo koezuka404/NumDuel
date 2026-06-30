@@ -1,4 +1,4 @@
-// Redis 補助ストア
+//Redis補助ストア
 package redis
 
 import (
@@ -151,13 +151,13 @@ func (s *Store) GetTurn(ctx context.Context, gameID uuid.UUID) (*usecase.TurnInf
 	}, nil
 }
 
-// ExpiredTurnEntry は期限切れターン 1 件
+//ExpiredTurnEntryは期限切れターン1件
 type ExpiredTurnEntry struct {
 	GameID   uuid.UUID
 	PlayerID uuid.UUID
 }
 
-// ListExpiredTurns は game:*:turn のうち expiresAt <= now のものを返す
+//ListExpiredTurnsはgame:*:turnのうちexpiresAt<=nowのものを返す
 func (s *Store) ListExpiredTurns(ctx context.Context, now time.Time) ([]ExpiredTurnEntry, error) {
 	now = now.UTC()
 	var (
@@ -217,7 +217,7 @@ func (s *Store) GetForceLogoutBefore(ctx context.Context, userID uuid.UUID) (tim
 	return time.Unix(sec, 0).UTC(), nil
 }
 
-// SetForceLogoutBefore は AutoLogoutWorker / 管理操作向けTTL 30 日固定
+//SetForceLogoutBeforeはAutoLogoutWorker/管理操作向けTTL30日固定
 func (s *Store) SetForceLogoutBefore(ctx context.Context, userID uuid.UUID, t time.Time) error {
 	return s.rdb.Set(ctx, forceLogoutKey(userID), strconv.FormatInt(t.UTC().Unix(), 10), forceLogoutTTL).Err()
 }
@@ -252,7 +252,7 @@ func (s *Store) GetBackupStatus(ctx context.Context) (*usecase.BackupStatus, err
 	return out, nil
 }
 
-// SetBackupStatus は BackupWorker 成功/失敗時に更新する
+//SetBackupStatusはBackupWorker成功/失敗時に更新する
 func (s *Store) SetBackupStatus(ctx context.Context, status string, lastSyncedAt time.Time) error {
 	payload := map[string]string{"status": status}
 	if !lastSyncedAt.IsZero() {

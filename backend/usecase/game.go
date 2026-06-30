@@ -11,7 +11,7 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
-// 対戦ゲームのユースケース。
+//対戦ゲームのユースケース。
 type IGameUsecase interface {
 	GetGameState(ctx context.Context, userID, gameID uuid.UUID) (*GameStateOutput, error)
 	SyncGameState(ctx context.Context, userID, gameID uuid.UUID) (*GameStateOutput, error)
@@ -22,13 +22,13 @@ type IGameUsecase interface {
 	RecoverActiveGames(ctx context.Context) error
 }
 
-// 秘密数字の hash 化と照合。
+//秘密数字のhash化と照合。
 type ISecretHasher interface {
 	Hash(secret [4]int, gameID uuid.UUID, slot int) (string, error)
 	Verify(storedHash string, guess [4]int, gameID uuid.UUID, slot int) ([]model.DigitResult, error)
 }
 
-// ゲーム操作の分散ロック。
+//ゲーム操作の分散ロック。
 type IGameLockStore interface {
 	AcquireLock(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
@@ -39,7 +39,7 @@ type TurnInfo struct {
 	ExpiresAt time.Time
 }
 
-// ターンタイマーの Redis 管理。
+//ターンタイマーのRedis管理。
 type ITurnStore interface {
 	SetTurn(ctx context.Context, gameID uuid.UUID, turn int, playerID uuid.UUID, startedAt, expiresAt time.Time) error
 	GetTurn(ctx context.Context, gameID uuid.UUID) (*TurnInfo, error)
@@ -47,12 +47,12 @@ type ITurnStore interface {
 	DeleteTurn(ctx context.Context, gameID uuid.UUID) error
 }
 
-// 推測数字の乱数生成。
+//推測数字の乱数生成。
 type IGuessNumberGenerator interface {
 	GenerateGuessNumber() (string, error)
 }
 
-// WebSocket イベント通知。
+//WebSocketイベント通知。
 type IEventNotifier interface {
 	SendToUser(ctx context.Context, userID uuid.UUID, eventType string, payload map[string]any) error
 }

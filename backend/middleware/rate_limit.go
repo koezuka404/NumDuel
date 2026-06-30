@@ -1,4 +1,4 @@
-// IP 単位のスライディングウィンドウで /api への過剰リクエストを 429 で拒否
+//IP単位のスライディングウィンドウで/apiへの過剰リクエストを429で拒否
 package middleware
 
 import (
@@ -57,7 +57,7 @@ func rateLimitForPath(path string) (limit int, window time.Duration) {
 	}
 }
 
-// RateLimit は /api グループ向け IP レート制限（login/register/refresh は厳しめ）
+//RateLimitは/apiグループ向けIPレート制限（login/register/refreshは厳しめ）
 func RateLimit() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

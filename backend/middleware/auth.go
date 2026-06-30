@@ -1,4 +1,4 @@
-// JWT 認証 MiddlewareCookie access_token を検証する
+//JWT認証MiddlewareCookieaccess_tokenを検証する
 package middleware
 
 import (

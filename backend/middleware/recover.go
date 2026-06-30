@@ -1,4 +1,4 @@
-// panic を 500 internal_error JSON に変換しログ出力
+//panicを500internal_errorJSONに変換しログ出力
 package middleware
 
 import (
@@ -10,8 +10,8 @@ import (
 	"github.com/numduel/numduel/dto"
 )
 
-// Recover は Handler / 下流 Middleware 内の panic を捕捉する
-// クライアントには { error: { code: internal_error } } を返し、詳細はサーバログのみ
+//RecoverはHandler/下流Middleware内のpanicを捕捉する
+//クライアントには{error:{code:internal_error}}を返し、詳細はサーバログのみ
 func Recover() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) (err error) {

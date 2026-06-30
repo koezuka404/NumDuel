@@ -12,18 +12,18 @@ type BackupStatus struct {
 	LastSyncedAt *time.Time
 }
 
-// バックアップ状態の読み取り。
+//バックアップ状態の読み取り。
 type IBackupStatusReader interface {
 	GetBackupStatus(ctx context.Context) (*BackupStatus, error)
 }
 
-// バックアップ状態の Redis 管理。
+//バックアップ状態のRedis管理。
 type IBackupStatusStore interface {
 	IBackupStatusReader
 	SetBackupStatus(ctx context.Context, status string, lastSyncedAt time.Time) error
 }
 
-// DB バックアップ同期ユースケース。
+//DBバックアップ同期ユースケース。
 type IBackupUsecase interface {
 	RunSync(ctx context.Context) error
 }
