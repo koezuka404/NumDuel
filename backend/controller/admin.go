@@ -102,6 +102,10 @@ func (h *AdminController) ListLogTypes(c echo.Context) error {
 
 // DownloadLogs GET /api/admin/logs/download
 func (h *AdminController) DownloadLogs(c echo.Context) error {
+	auth, ok := middleware.AuthFrom(c)
+	if !ok {
+		return dto.WriteError(c, model.ErrUnauthorized())
+	}
 	userID, err := usecase.ParseOptionalUUID(c.QueryParam("userId"))
 	if err != nil {
 		return dto.WriteError(c, err)
@@ -114,7 +118,7 @@ func (h *AdminController) DownloadLogs(c echo.Context) error {
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	csvData, err := usecase.DownloadActivityLogsCSV(c.Request().Context(), h.Deps, c.QueryParam("logType"), userID, from, to)
+	csvData, err := usecase.DownloadActivityLogsCSV(c.Request().Context(), h.Deps, auth.UserID, c.QueryParam("logType"), userID, from, to)
 	if err != nil {
 		return dto.WriteError(c, err)
 	}

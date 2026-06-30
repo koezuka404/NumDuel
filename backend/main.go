@@ -87,6 +87,7 @@ func main() {
 	adminDeps := usecase.AdminDeps{
 		Repo: dbSetup.Repo, Tx: dbSetup.Tx, WSSessions: sessionStore,
 		ForceLogout: redisStore, BackupStatus: redisStore,
+		Locks: redisStore, AdminLockTTL: cfg.AdminLockTTL(),
 	}
 	wsAuthDeps := usecase.WSAuthDeps{
 		Repo: dbSetup.Repo, JWT: jwtService,

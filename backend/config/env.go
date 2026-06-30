@@ -19,6 +19,7 @@ type Config struct {
 	CookieSecure           bool
 	GameSecretPepper       string
 	GameLockSeconds        int
+	AdminLockSeconds       int // 管理操作 Redis ロック TTL（§13.10.2、既定 5）
 	TurnDurationSeconds        int
 	TurnTimeoutPollSeconds     int
 	SecretSetupSeconds         int
@@ -48,6 +49,7 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		Port:                   envInt(getenv, "PORT", 8080),
 		GameSecretPepper:       getenv("GAME_SECRET_PEPPER"),
 		GameLockSeconds:        envInt(getenv, "GAME_LOCK_SECONDS", 2),
+		AdminLockSeconds:       envInt(getenv, "ADMIN_LOCK_SECONDS", 5),
 		TurnDurationSeconds:    envInt(getenv, "TURN_DURATION_SECONDS", 30),
 		TurnTimeoutPollSeconds:   envInt(getenv, "TURN_TIMEOUT_POLL_SECONDS", 1),
 		SecretSetupSeconds:       envInt(getenv, "SECRET_SETUP_SECONDS", 60),
@@ -89,7 +91,7 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	if cfg.Port <= 0 || cfg.JWTExpiryMinutes <= 0 || cfg.RefreshTokenExpiryDays <= 0 {
 		return nil, fmt.Errorf("invalid numeric config")
 	}
-	if cfg.GameLockSeconds <= 0 || cfg.TurnDurationSeconds <= 0 || cfg.SecretSetupSeconds <= 0 {
+	if cfg.GameLockSeconds <= 0 || cfg.AdminLockSeconds <= 0 || cfg.TurnDurationSeconds <= 0 || cfg.SecretSetupSeconds <= 0 {
 		return nil, fmt.Errorf("invalid game timing config")
 	}
 	if cfg.SessionTimeoutMinutes <= 0 || cfg.AutoLogoutPollSeconds <= 0 {
@@ -100,6 +102,10 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 
 func (c *Config) GameLockTTL() time.Duration {
 	return time.Duration(c.GameLockSeconds) * time.Second
+}
+
+func (c *Config) AdminLockTTL() time.Duration {
+	return time.Duration(c.AdminLockSeconds) * time.Second
 }
 
 func (c *Config) TurnDuration() time.Duration {

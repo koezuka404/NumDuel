@@ -19,6 +19,8 @@ type AdminDeps struct {
 	WSSessions    model.WSSessionStore
 	ForceLogout   model.ForceLogoutStore
 	BackupStatus  model.BackupStatusStore
+	Locks         model.GameLockStore // admin:{adminId}:*_lock（§13.10.2）
+	AdminLockTTL  time.Duration
 	Now           func() time.Time
 }
 
@@ -61,6 +63,9 @@ func SearchAdminUsers(ctx context.Context, d AdminDeps, query string) ([]AdminUs
 // DeleteUser は master によるユーザーの論理削除
 // force_logout_before SET → WS 切断 → refresh 失効 → matching キュー削除 → users.deleted_at 更新 → activity_logs
 func DeleteUser(ctx context.Context, d AdminDeps, adminID, targetID uuid.UUID) error {
+	if err := acquireAdminLock(ctx, d, adminUserDeleteLockKey(adminID)); err != nil {
+		return err
+	}
 	if adminID == targetID {
 		return model.ErrCannotDeleteSelf()
 	}
@@ -144,7 +149,10 @@ func ListActivityLogTypes(ctx context.Context, d AdminDeps) ([]string, error) {
 	return types, nil
 }
 
-func DownloadActivityLogsCSV(ctx context.Context, d AdminDeps, logType string, userID *uuid.UUID, from, to *time.Time) ([]byte, error) {
+func DownloadActivityLogsCSV(ctx context.Context, d AdminDeps, adminID uuid.UUID, logType string, userID *uuid.UUID, from, to *time.Time) ([]byte, error) {
+	if err := acquireAdminLock(ctx, d, adminLogDownloadLockKey(adminID)); err != nil {
+		return nil, err
+	}
 	rows, _, err := d.Repo.ActivityLogs().Search(ctx, logType, userID, from, to, 1, 10000)
 	if err != nil {
 		return nil, model.ErrInternal("failed to search activity logs")
@@ -173,6 +181,9 @@ func DownloadActivityLogsCSV(ctx context.Context, d AdminDeps, logType string, u
 }
 
 func RebuildRankingAsAdmin(ctx context.Context, d AdminDeps, adminID uuid.UUID) error {
+	if err := acquireAdminLock(ctx, d, adminRankingRebuildLockKey(adminID)); err != nil {
+		return err
+	}
 	if err := RebuildRanking(ctx, RankingDeps{Repo: d.Repo, Tx: d.Tx, Now: d.Now}); err != nil {
 		return err
 	}
