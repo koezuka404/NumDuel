@@ -100,6 +100,10 @@ func main() {
 		JWTMin: cfg.JWTExpiryMinutes, Repo: dbSetup.Repo,
 	}
 
+	if err := usecase.RecoverActiveGames(context.Background(), gameDeps); err != nil {
+		log.Printf("recover active games: %v", err)
+	}
+
 	e := echo.New()
 	e.GET("/health", func(c echo.Context) error {
 		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
