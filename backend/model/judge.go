@@ -1,7 +1,5 @@
-// 桁判定の純粋関数DB/HTTP に依存しない（Domain 層の核心ロジック）
 package model
 
-// JudgeDigits は各桁を secret と比較し 0=miss / 1=hit を返す
 func JudgeDigits(secret, guess [4]int) [4]DigitResult {
 	var results [4]DigitResult
 	for i := 0; i < 4; i++ {
@@ -12,7 +10,6 @@ func JudgeDigits(secret, guess [4]int) [4]DigitResult {
 	return results
 }
 
-// IsWin は 4 桁すべて hit なら true
 func IsWin(results [4]DigitResult) bool {
 	for _, r := range results {
 		if r != DigitHit {
@@ -20,4 +17,22 @@ func IsWin(results [4]DigitResult) bool {
 		}
 	}
 	return true
+}
+
+func HitCount(results [4]DigitResult) int {
+	n := 0
+	for _, r := range results {
+		if r == DigitHit {
+			n++
+		}
+	}
+	return n
+}
+
+func DigitResultsToInts(results []DigitResult) []int {
+	out := make([]int, len(results))
+	for i, r := range results {
+		out[i] = int(r)
+	}
+	return out
 }

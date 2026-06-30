@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// MatchingQueueEntry は matching_queue テーブルのレコード
 type MatchingQueueEntry struct {
 	ID        uuid.UUID           `gorm:"type:uuid;primaryKey"`
 	UserID    uuid.UUID           `gorm:"type:uuid;not null"`
