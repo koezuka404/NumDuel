@@ -105,6 +105,7 @@ func main() {
 	autoLogoutDeps := usecase.AutoLogoutDeps{
 		Repo: dbSetup.Repo, Tx: dbSetup.Tx, ForceLogout: redisStore,
 		SessionTimeout: cfg.SessionTimeout(),
+		// WS 接続中なら unauthorized を返してから切断
 		ForceDisconnect: func(ctx context.Context, userID uuid.UUID) error {
 			return sessionStore.DisconnectWithError(ctx, userID, model.CodeUnauthorized, "invalid credentials")
 		},
@@ -134,6 +135,8 @@ func main() {
 			JWT: jwtService, Revoker: redisStore,
 			ForceLogout: redisStore, Repo: dbSetup.Repo,
 		},
+		// protected API ごとに last_activity_at を更新（AutoLogoutWorker 連携）
+		Activity: middleware.ActivityUpdateConfig{Repo: dbSetup.Repo},
 		Cfg: cfg,
 	})
 
@@ -153,6 +156,7 @@ func main() {
 		}).Run(workerCtx)
 	}
 	if redisStore != nil && cfg.AutoLogoutPollSeconds > 0 {
+		// last_activity_at が SESSION_TIMEOUT_MINUTES を超えたユーザーを自動ログアウト
 		go (&worker.AutoLogoutWorker{
 			Deps:     autoLogoutDeps,
 			Interval: cfg.AutoLogoutPollInterval(),

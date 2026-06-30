@@ -11,11 +11,12 @@ import (
 )
 
 // AutoLogoutDeps は AutoLogoutUseCase の依存関係
+// SESSION_TIMEOUT_MINUTES 分間 last_activity_at が更新されていないユーザーを対象にする
 type AutoLogoutDeps struct {
 	Repo            repository.IRepository
 	Tx              repository.TxManager
-	ForceLogout     model.ForceLogoutStore
-	ForceDisconnect func(ctx context.Context, userID uuid.UUID) error
+	ForceLogout     model.ForceLogoutStore // Redis user:{userId}:force_logout_before
+	ForceDisconnect func(ctx context.Context, userID uuid.UUID) error // WS ERROR 送信後に切断
 	SessionTimeout  time.Duration
 	Now             func() time.Time
 }
@@ -28,6 +29,7 @@ func (d AutoLogoutDeps) now() time.Time {
 }
 
 // AutoLogout は無操作ユーザーを強制ログアウトする
+// last_activity_at < now - SessionTimeout のユーザーを列挙し、1 件ずつ autoLogoutUser する
 func AutoLogout(ctx context.Context, d AutoLogoutDeps) error {
 	if d.SessionTimeout <= 0 {
 		return nil
@@ -49,6 +51,8 @@ func AutoLogout(ctx context.Context, d AutoLogoutDeps) error {
 	return nil
 }
 
+// autoLogoutUser は 1 ユーザーのセッションを切る
+// 1) force_logout_before SET  2) WS 切断  3) refresh 失効 + login_logs(auto_logout) + last_activity_at 更新
 func autoLogoutUser(ctx context.Context, d AutoLogoutDeps, userID uuid.UUID, now time.Time) error {
 	if d.ForceLogout != nil {
 		if err := d.ForceLogout.SetForceLogoutBefore(ctx, userID, now); err != nil {

@@ -20,7 +20,8 @@ type IUserRepository interface {
 	List(ctx context.Context, page, limit int) ([]*model.User, int64, error)
 	Search(ctx context.Context, query string, page, limit int) ([]*model.User, int64, error)
 	FindUpdatedSince(ctx context.Context, since time.Time) ([]*model.User, error)
-	ListInactiveSince(ctx context.Context, before time.Time) ([]*model.User, error)
+	ListInactiveSince(ctx context.Context, before time.Time) ([]*model.User, error) // AutoLogoutWorker 用
+	TouchLastActivity(ctx context.Context, userID uuid.UUID, at time.Time) error // ActivityUpdateMiddleware 用（単一 UPDATE）
 }
 
 // IGameRepository は games テーブルへのアクセス

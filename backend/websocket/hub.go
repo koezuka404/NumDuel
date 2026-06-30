@@ -116,6 +116,7 @@ func (s *SessionStore) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 	return s.Redis.DeleteUser(ctx, userID)
 }
 
+// DisconnectWithError は AutoLogout 向け ERROR 送信後に WS 切断 + Redis ws:user 削除
 func (s *SessionStore) DisconnectWithError(ctx context.Context, userID uuid.UUID, code, message string) error {
 	s.Hub.SendError(userID, code, message)
 	return s.DeleteUser(ctx, userID)

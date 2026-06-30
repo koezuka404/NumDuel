@@ -23,8 +23,8 @@ type Config struct {
 	TurnTimeoutPollSeconds     int
 	SecretSetupSeconds         int
 	SecretTimeoutPollSeconds   int
-	SessionTimeoutMinutes      int
-	AutoLogoutPollSeconds      int
+	SessionTimeoutMinutes      int // 無操作とみなす分数（デフォルト 5）
+	AutoLogoutPollSeconds      int // AutoLogoutWorker のポーリング間隔秒（デフォルト 60）
 	WSAllowedOrigins           []string
 }
 

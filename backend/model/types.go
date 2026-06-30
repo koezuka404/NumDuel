@@ -41,5 +41,5 @@ type LoginAction string
 const (
 	LoginActionLogin      LoginAction = "login"
 	LoginActionLogout     LoginAction = "logout"
-	LoginActionAutoLogout LoginAction = "auto_logout"
+	LoginActionAutoLogout LoginAction = "auto_logout" // AutoLogoutWorker が記録
 )

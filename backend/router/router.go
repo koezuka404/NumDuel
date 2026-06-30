@@ -23,6 +23,7 @@ type Deps struct {
 	WS       *infrws.Handler
 	JWT      *infrcrypto.JWTService
 	AuthMW   middleware.AuthConfig
+	Activity middleware.ActivityUpdateConfig // JWT 必須ルートで last_activity_at 更新
 	Cfg      *config.Config
 }
 
@@ -39,7 +40,11 @@ func Register(e *echo.Echo, deps Deps) {
 	api.POST("/auth/login", auth.Login)
 	api.POST("/auth/refresh", auth.Refresh)
 
-	protected := api.Group("", middleware.Auth(deps.AuthMW))
+	// Auth 通過後: last_activity_at 更新 → AutoLogout 判定の延長
+	protected := api.Group("",
+		middleware.Auth(deps.AuthMW),
+		middleware.ActivityUpdate(deps.Activity),
+	)
 	protected.POST("/auth/logout", auth.Logout)
 	protected.GET("/me", me.Get)
 	protected.GET("/me/profile", me.GetProfile)

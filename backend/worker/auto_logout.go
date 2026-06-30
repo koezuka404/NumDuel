@@ -10,12 +10,14 @@ import (
 )
 
 // AutoLogoutWorker は無操作ユーザーをポーリングし AutoLogout を実行する
+// AUTO_LOGOUT_POLL_SECONDS 間隔で DB を走査、Redis 未接続時は起動しない
 type AutoLogoutWorker struct {
 	Deps     usecase.AutoLogoutDeps
 	Interval time.Duration
 }
 
 func (w *AutoLogoutWorker) Run(ctx context.Context) {
+	// force_logout_before は Redis 必須
 	if w.Deps.ForceLogout == nil || w.Interval <= 0 {
 		return
 	}

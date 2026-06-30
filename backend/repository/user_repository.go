@@ -125,6 +125,7 @@ func (r *userRepository) FindUpdatedSince(ctx context.Context, since time.Time) 
 	return out, nil
 }
 
+// ListInactiveSince は last_activity_at が before より古い未削除ユーザーを返す（AutoLogoutWorker 用）
 func (r *userRepository) ListInactiveSince(ctx context.Context, before time.Time) ([]*model.User, error) {
 	var rows []model.User
 	err := r.db.WithContext(ctx).
@@ -139,4 +140,16 @@ func (r *userRepository) ListInactiveSince(ctx context.Context, before time.Time
 		out[i] = &row
 	}
 	return out, nil
+}
+
+// TouchLastActivity は last_activity_at / updated_at を更新する（ActivityUpdateMiddleware 用）
+// FindByID せず UPDATE のみ。deleted_at IS NULL のユーザーのみ対象
+func (r *userRepository) TouchLastActivity(ctx context.Context, userID uuid.UUID, at time.Time) error {
+	res := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ? AND deleted_at IS NULL", userID).
+		Updates(map[string]any{
+			"last_activity_at": at,
+			"updated_at":       at,
+		})
+	return res.Error
 }
