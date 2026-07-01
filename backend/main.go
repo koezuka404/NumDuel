@@ -55,7 +55,10 @@ func main() {
 		log.Fatalf("secret hasher: %v", err)
 	}
 
-	rdb := db.OpenRedis()
+	rdb, err := db.OpenRedis(cfg.Production)
+	if err != nil {
+		log.Fatalf("redis: %v", err)
+	}
 	if rdb != nil {
 		defer rdb.Close()
 	}

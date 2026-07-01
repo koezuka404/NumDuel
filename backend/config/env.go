@@ -10,6 +10,7 @@ import (
 )
 
 type Config struct {
+	Production             bool //APP_ENV=production のとき true（Redis必須）
 	DatabaseURL            string
 	BackupDatabaseURL      string
 	Port                   int
@@ -50,6 +51,7 @@ func Load() (*Config, error) {
 //LoadFromEnvはgetenvから設定を読み込む（テスト用に注入可能）
 func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	cfg := &Config{
+		Production:             isProductionEnv(getenv("APP_ENV"), getenv("ENV")),
 		DatabaseURL:            getenv("DATABASE_URL"),
 		BackupDatabaseURL:      getenv("BACKUP_DATABASE_URL"),
 		JWTSecret:              getenv("JWT_SECRET"),
@@ -117,7 +119,30 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	if cfg.SessionTimeoutMinutes <= 0 || cfg.AutoLogoutPollSeconds <= 0 {
 		return nil, fmt.Errorf("invalid session config")
 	}
+	if cfg.Production && redisAddrConfigured(getenv) == "" {
+		return nil, fmt.Errorf("REDIS_URL or REDIS_ADDR is required when APP_ENV=production")
+	}
 	return cfg, nil
+}
+
+func isProductionEnv(values ...string) bool {
+	for _, v := range values {
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "production", "prod":
+			return true
+		}
+	}
+	return false
+}
+
+func redisAddrConfigured(getenv func(string) string) string {
+	if u := strings.TrimSpace(getenv("REDIS_URL")); u != "" {
+		return u
+	}
+	if a := strings.TrimSpace(getenv("REDIS_ADDR")); a != "" {
+		return a
+	}
+	return ""
 }
 
 func (c *Config) GameLockTTL() time.Duration {

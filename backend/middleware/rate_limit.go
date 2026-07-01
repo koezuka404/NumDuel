@@ -1,4 +1,4 @@
-//IP単位のスライディングウィンドウで/apiへの過剰リクエストを429で拒否
+//IP/ユーザー単位のスライディングウィンドウで/apiへの過剰リクエストを429で拒否
 package middleware
 
 import (
@@ -41,29 +41,52 @@ func (r *rateLimiter) allow(key string, limit int, window time.Duration) bool {
 	return true
 }
 
-var apiRateLimiter = newRateLimiter()
+var publicRateLimiter = newRateLimiter()
+var userRateLimiter = newRateLimiter()
 
-func rateLimitForPath(path string) (limit int, window time.Duration) {
+func publicRateLimitForPath(path string) (limit int, window time.Duration, apply bool) {
 	window = time.Minute
 	switch path {
 	case "/api/auth/login":
-		return 10, window
+		return 10, window, true
 	case "/api/auth/register":
-		return 5, window
+		return 5, window, true
 	case "/api/auth/refresh":
-		return 30, window
+		return 30, window, true
 	default:
-		return 120, window
+		return 0, window, false
 	}
 }
 
-//RateLimitは/apiグループ向けIPレート制限（login/register/refreshは厳しめ）
-func RateLimit() echo.MiddlewareFunc {
+//RateLimitPublicはlogin/register/refresh向けIPレート制限（§11.8）
+func RateLimitPublic() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			limit, window := rateLimitForPath(c.Path())
+			limit, window, apply := publicRateLimitForPath(c.Path())
+			if !apply {
+				return next(c)
+			}
 			key := c.RealIP() + ":" + c.Path()
-			if !apiRateLimiter.allow(key, limit, window) {
+			if !publicRateLimiter.allow(key, limit, window) {
+				return dto.WriteError(c, usecase.ErrRateLimitExceeded)
+			}
+			return next(c)
+		}
+	}
+}
+
+//UserRateLimitは認証済みAPI向けユーザー単位120回/分（§11.8）。Authの後に適用する。
+func UserRateLimit() echo.MiddlewareFunc {
+	const limit = 120
+	window := time.Minute
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			auth, ok := AuthFrom(c)
+			if !ok {
+				return next(c)
+			}
+			key := auth.UserID.String()
+			if !userRateLimiter.allow(key, limit, window) {
 				return dto.WriteError(c, usecase.ErrRateLimitExceeded)
 			}
 			return next(c)
