@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { notifyUnauthorized } from '../api/client';
 import type { WSMessage } from '../types/dto';
 import { useAuth } from './useAuth';
 

@@ -18,6 +18,18 @@ const defaultFetchOptions: RequestInit = {
   },
 };
 
+type UnauthorizedHandler = () => void;
+
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+export function setOnUnauthorized(handler: UnauthorizedHandler | null) {
+  onUnauthorized = handler;
+}
+
+export function notifyUnauthorized() {
+  onUnauthorized?.();
+}
+
 async function parseError(res: Response): Promise<ApiError> {
   const body = (await res.json().catch(() => ({}))) as ApiErrorBody;
   const code = body.error?.code ?? 'internal_error';

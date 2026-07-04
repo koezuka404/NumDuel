@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { apiData, apiFetch } from '../api/client';
+import { apiData, apiFetch, setOnUnauthorized } from '../api/client';
 import type { ApiDataResponse, AuthUser } from '../types/dto';
 
 type AuthContextValue = {
