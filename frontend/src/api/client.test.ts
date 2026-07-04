@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, apiData, apiFetch, downloadUrl, notifyUnauthorized, setOnUnauthorized } from './client';
+import {  apiData, apiFetch, downloadUrl, notifyUnauthorized, setOnUnauthorized } from './client';
 
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   vi.stubGlobal(
