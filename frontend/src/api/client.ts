@@ -1,5 +1,8 @@
 import type { ApiDataResponse, ApiErrorBody } from '../types/dto';
+import { resolveApiBaseURL } from '../lib/apiBase';
 import { apiErrorMessage } from '../lib/labels';
+
+const API_BASE_URL = resolveApiBaseURL();
 
 export class ApiError extends Error {
   readonly code: string;
@@ -40,7 +43,7 @@ async function parseError(res: Response): Promise<ApiError> {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...defaultFetchOptions,
     ...options,
     headers: {
@@ -52,7 +55,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}, retri
   if (res.status === 404) {
     const body = (await res.clone().json().catch(() => ({}))) as ApiErrorBody;
     if (body.error?.code === 'token_expired' && !retried) {
-      await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+      await fetch(`${API_BASE_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
       return apiFetch<T>(path, options, true);
     }
   }
@@ -83,5 +86,5 @@ export async function apiData<T>(path: string, options: RequestInit = {}): Promi
 }
 
 export function downloadUrl(path: string): string {
-  return `/api${path}`;
+  return `${API_BASE_URL}${path}`;
 }

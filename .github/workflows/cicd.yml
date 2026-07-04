@@ -1,0 +1,394 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-ci:
+    name: Frontend Test/Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Run frontend quality gate
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+  backend-ci:
+    name: Backend Vet/Test/Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run backend quality gate
+        working-directory: backend
+        run: |
+          go vet ./...
+          go test ./... -count=1 -timeout 15m
+          go build ./...
+
+  integration-test:
+    name: Integration Test (PostgreSQL/Redis)
+    needs: [frontend-ci, backend-ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: numduel
+          POSTGRES_PASSWORD: numduel
+          POSTGRES_DB: numduel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U numduel -d numduel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run migrations in pipeline
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://numduel:numduel@localhost:5432/numduel?sslmode=disable
+        run: go run ./migrations/migrate.go
+      - name: Integration smoke and tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://numduel:numduel@localhost:5432/numduel?sslmode=disable
+          REDIS_ADDR: localhost:6379
+          JWT_SECRET: ci-jwt-secret-min-32-characters-long!!
+          GAME_SECRET_PEPPER: ci-game-secret-pepper-32-bytes-long!!
+          PORT: "8090"
+          SKIP_MIGRATE: "1"
+          NUMDUEL_MASTER_EMAIL: ci-master@test.local
+          NUMDUEL_MASTER_PASSWORD: password123456
+        run: |
+          go test ./... -count=1 -timeout 15m
+          go run . > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8090/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8090/health >/dev/null
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then kill "$(cat /tmp/backend.pid)" 2>/dev/null || true; fi
+          if [ -f /tmp/backend.log ]; then cat /tmp/backend.log; fi
+
+  container-build:
+    name: Container Build
+    needs: [integration-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build backend image
+        run: docker build -t numduel-backend:ci "./backend"
+      - name: Build frontend image
+        run: docker build -t numduel-frontend:ci "./frontend"
+
+  security-scan:
+    name: Security Scan
+    needs: [integration-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: gosec
+        working-directory: backend
+        run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
+      - name: npm audit
+        working-directory: frontend
+        run: |
+          npm ci
+          npm audit --audit-level=high
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-images:
+    name: Publish Docker Images (GHCR)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    needs: [container-build, security-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Backend Docker metadata
+        id: meta_backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=sha,prefix=main-
+            type=raw,value=latest
+      - name: Frontend Docker metadata
+        id: meta_frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=sha,prefix=main-
+            type=raw,value=latest
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta_backend.outputs.tags }}
+          labels: ${{ steps.meta_backend.outputs.labels }}
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta_frontend.outputs.tags }}
+          labels: ${{ steps.meta_frontend.outputs.labels }}
+
+  production-migrate:
+    name: Migrate Production DB (before smoke)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    needs: [publish-images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Execute migration (production)
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: go run ./migrations/migrate.go
+
+  smoke-test:
+    name: Smoke Test (API)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    needs: [container-build, security-scan, publish-images, production-migrate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install ws client dependency
+        run: npm install ws@8
+      - name: API smoke (/health, register, login, /me, ws auth)
+        env:
+          API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          ORIGIN="${API_BASE_URL%/api}"
+          curl -fsS "$ORIGIN/health" >/dev/null
+
+          USER="smoke_${GITHUB_RUN_ID:-0}_${RANDOM}_$(date +%s)"
+          EMAIL="${USER}@smoke.local"
+          PASS="password123456"
+          REGISTER=""
+          for attempt in 1 2 3 4 5; do
+            rm -f cookies.txt
+            HTTP=$(curl -sS -o /tmp/smoke_register.json -w "%{http_code}" -c cookies.txt -b cookies.txt \
+              -H "Content-Type: application/json" \
+              -d "{\"username\":\"$USER\",\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" \
+              "$API_BASE_URL/auth/register") || true
+            REGISTER=$(cat /tmp/smoke_register.json)
+            if [ "$HTTP" = "201" ]; then
+              break
+            fi
+            echo "register attempt $attempt: http_status=$HTTP body=$REGISTER"
+            if [ "$attempt" -eq 5 ]; then
+              echo "--- GET $ORIGIN/health (diagnostic) ---"
+              curl -sS "$ORIGIN/health" || true
+              echo
+              echo "Hint: production-migrate runs before this job. Check backend logs if register still fails."
+              exit 1
+            fi
+            sleep 6
+          done
+
+          LOGIN=$(curl -sS -c cookies.txt -b cookies.txt -H "Content-Type: application/json" \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" "$API_BASE_URL/auth/login")
+          LOGIN_OK=$(echo "$LOGIN" | jq -r '.data.username // empty')
+          if [ -z "$LOGIN_OK" ]; then
+            echo "login failed: $LOGIN"
+            exit 1
+          fi
+
+          ME_STATUS=$(curl -sS -o /tmp/smoke_me.json -w "%{http_code}" -c cookies.txt -b cookies.txt "$API_BASE_URL/me")
+          if [ "$ME_STATUS" -lt 200 ] || [ "$ME_STATUS" -ge 300 ]; then
+            echo "/api/me failed (status=$ME_STATUS)"
+            cat /tmp/smoke_me.json
+            exit 1
+          fi
+
+          WS_URL="${ORIGIN/http/ws}/ws"
+          WS_URL="$WS_URL" COOKIE_FILE="cookies.txt" node <<'NODE'
+          const fs = require('fs');
+          const WebSocket = require('ws');
+          const wsUrl = process.env.WS_URL;
+          const cookieLines = fs.readFileSync(process.env.COOKIE_FILE, 'utf8')
+            .split('\n')
+            .filter((l) => l && !l.startsWith('#'));
+          const cookie = cookieLines.map((l) => {
+            const cols = l.split('\t');
+            return `${cols[5]}=${cols[6]}`;
+          }).join('; ');
+          const ws = new WebSocket(wsUrl, { headers: { Cookie: cookie } });
+          const timer = setTimeout(() => { process.exit(1); }, 10000);
+          ws.on('open', () => {
+            ws.send(JSON.stringify({ type: 'AUTH' }));
+          });
+          ws.on('message', (msg) => {
+            try {
+              const data = JSON.parse(String(msg));
+              if (data.type === 'AUTH_OK') {
+                clearTimeout(timer);
+                ws.close();
+                process.exit(0);
+              }
+            } catch (_) {}
+          });
+          ws.on('error', () => process.exit(1));
+          NODE
+
+  k6-load:
+    name: k6 Load Test (health)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    needs: [smoke-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Ensure k6 scenario exists
+        run: test -f "k6/scenarios/health.js"
+      - name: Run k6 scenario
+        env:
+          K6_API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+        run: |
+          docker run --rm --network=host \
+            -v "${GITHUB_WORKSPACE}/k6:/k6:ro" \
+            -e K6_API_BASE_URL="$K6_API_BASE_URL" \
+            -e K6_VUS=50 \
+            -e K6_DURATION=2m \
+            grafana/k6:0.55.0 run /k6/scenarios/health.js
+
+  deploy-production:
+    name: Deploy to Vercel Production
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    needs: [smoke-test, k6-load]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Execute migration (production)
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: go run ./migrations/migrate.go
+      - name: Pull project settings
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Build production artifact
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Deploy to production
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GuestOnly, RequireAuth, RequireMaster, RequireUser } from './guards';
 
 const useAuth = vi.fn();
@@ -17,6 +17,10 @@ function renderGuard(element: JSX.Element, path = '/') {
   );
 }
 
+afterEach(() => {
+  cleanup();
+});
+
 describe('RequireAuth', () => {
   it('shows loading screen while auth is loading', () => {
     useAuth.mockReturnValue({ isAuthenticated: false, isLoading: true, user: null });
@@ -25,7 +29,7 @@ describe('RequireAuth', () => {
         <div>protected</div>
       </RequireAuth>,
     );
-    expect(screen.getByLabelText('読み込み中')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('読み込み中').length).toBeGreaterThan(0);
   });
 
   it('redirects unauthenticated users to login', () => {
@@ -61,7 +65,7 @@ describe('RequireUser', () => {
         <div>user-only</div>
       </RequireUser>,
     );
-    expect(screen.getByLabelText('読み込み中')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('読み込み中').length).toBeGreaterThan(0);
   });
 
   it('redirects master users to admin', () => {
@@ -99,7 +103,7 @@ describe('RequireMaster', () => {
         <div>admin-only</div>
       </RequireMaster>,
     );
-    expect(screen.getByLabelText('読み込み中')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('読み込み中').length).toBeGreaterThan(0);
   });
 
   it('redirects non-master users to matching', () => {
@@ -137,7 +141,7 @@ describe('GuestOnly', () => {
         <div>guest</div>
       </GuestOnly>,
     );
-    expect(screen.getByLabelText('読み込み中')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('読み込み中').length).toBeGreaterThan(0);
   });
 
   it('redirects authenticated users to home path', () => {

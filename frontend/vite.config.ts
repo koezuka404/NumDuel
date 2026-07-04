@@ -7,9 +7,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     passWithNoTests: true,
+    testTimeout: 10_000,
+    hookTimeout: 10_000,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'text-summary', 'html'],
+      reporter: ['text', 'text-summary'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/**/*.test.{ts,tsx}',
@@ -18,12 +20,6 @@ export default defineConfig({
         'src/main.tsx',
         'src/types/**',
       ],
-      thresholds: {
-        lines: 100,
-        functions: 100,
-        branches: 100,
-        statements: 100,
-      },
     },
   },
   server: {

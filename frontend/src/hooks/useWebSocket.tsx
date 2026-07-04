@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { notifyUnauthorized } from '../api/client';
+import { resolveApiBaseURL, resolveWsBaseURL } from '../lib/apiBase';
 import type { WSMessage } from '../types/dto';
 import { useAuth } from './useAuth';
 
@@ -25,10 +26,8 @@ type WebSocketContextValue = {
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 
-function wsUrl(): string {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}/ws`;
-}
+const API_BASE_URL = resolveApiBaseURL();
+const WS_BASE_URL = resolveWsBaseURL();
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, user } = useAuth();
@@ -69,7 +68,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const handleWsError = useCallback(
     async (code: string) => {
       if (code === 'token_expired') {
-        await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+        await fetch(`${API_BASE_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
         reconnectAttemptRef.current = 0;
         wsRef.current?.close();
         return;
@@ -87,7 +86,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       return;
     }
     setConnecting(true);
-    const ws = new WebSocket(wsUrl());
+    const ws = new WebSocket(WS_BASE_URL);
     wsRef.current = ws;
 
     ws.onopen = () => {

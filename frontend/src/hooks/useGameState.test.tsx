@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { createInitialGameState, gameReducer, GameStateProvider, useGameState } from '../hooks/useGameState';
+import { createInitialGameState, gameReducer, GameStateProvider, useGameState } from './useGameState';
 import type { GameStateDTO } from '../types/dto';
 
 describe('gameReducer', () => {
