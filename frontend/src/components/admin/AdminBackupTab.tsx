@@ -1,3 +1,4 @@
+import { backupStatusLabel } from '../../lib/labels';
 import { ProfileStat } from '../ui/FormField';
 import { formatDateTime } from '../../lib/format';
 import type { BackupStatusDTO } from '../../types/dto';
@@ -11,7 +12,7 @@ export default function AdminBackupTab({ backup }: Props) {
     <section className="form-card">
       <ProfileStat
         label="ステータス"
-        value={backup.status}
+        value={backupStatusLabel(backup.status)}
         valueClassName={backup.status === 'ok' ? 'backup-status-ok' : 'backup-status-error'}
       />
       <ProfileStat label="最終同期" value={backup.lastSyncedAt ? formatDateTime(backup.lastSyncedAt) : '-'} />

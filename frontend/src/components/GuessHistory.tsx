@@ -21,7 +21,7 @@ export default function GuessHistory({ guesses, emptyLabel = 'まだ予想があ
                 key={digitIndex}
                 className={`game-history__mark ${result === 1 ? 'game-history__mark--hit' : 'game-history__mark--miss'}`}
               >
-                {result === 1 ? 'O' : 'X'}
+                {result === 1 ? '○' : '×'}
               </span>
             ))}
           </div>

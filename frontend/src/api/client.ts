@@ -1,4 +1,5 @@
 import type { ApiDataResponse, ApiErrorBody } from '../types/dto';
+import { apiErrorMessage } from '../lib/labels';
 
 export class ApiError extends Error {
   readonly code: string;
@@ -33,7 +34,8 @@ export function notifyUnauthorized() {
 async function parseError(res: Response): Promise<ApiError> {
   const body = (await res.json().catch(() => ({}))) as ApiErrorBody;
   const code = body.error?.code ?? 'internal_error';
-  const message = body.error?.message ?? 'request failed';
+  const rawMessage = body.error?.message ?? '';
+  const message = apiErrorMessage(code, rawMessage);
   return new ApiError(code, message, res.status);
 }
 
@@ -56,8 +58,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}, retri
   }
 
   if (res.status === 401) {
-    window.location.href = '/login';
-    throw new ApiError('unauthorized', 'unauthorized', 401);
+    notifyUnauthorized();
+    throw new ApiError('unauthorized', apiErrorMessage('unauthorized', ''), 401);
   }
 
   if (res.status === 429) {

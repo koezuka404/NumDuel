@@ -37,6 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    setOnUnauthorized(() => setUser(null));
+    return () => setOnUnauthorized(null);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     (async () => {
       await refreshUser();

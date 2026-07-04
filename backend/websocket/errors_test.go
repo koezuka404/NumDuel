@@ -32,7 +32,7 @@ func TestWSErrorCodeAllBranches(t *testing.T) {
 		}
 	}
 	code, msg := wsErrorCode(errors.New("boom"))
-	if code != "internal_error" || msg != "internal server error" {
+	if code != "internal_error" || msg != model.ErrInternal.Error() {
 		t.Fatalf("default: %s %s", code, msg)
 	}
 }

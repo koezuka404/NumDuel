@@ -3,8 +3,22 @@ package controller
 import (
 	"time"
 
+	"github.com/numduel/numduel/model"
 	"github.com/numduel/numduel/usecase"
 )
+
+func loginActionLabel(action model.LoginAction) string {
+	switch action {
+	case model.LoginActionLogin:
+		return "ログイン"
+	case model.LoginActionLogout:
+		return "ログアウト"
+	case model.LoginActionAutoLogout:
+		return "自動ログアウト"
+	default:
+		return string(action)
+	}
+}
 
 func registerUserResponse(out *usecase.RegisterResult) map[string]any {
 	return map[string]any{
@@ -47,7 +61,7 @@ func loginHistoryResponse(items []usecase.LoginHistoryItem) []map[string]any {
 	rows := make([]map[string]any, len(items))
 	for i, item := range items {
 		rows[i] = map[string]any{
-			"action": string(item.Action), "createdAt": item.CreatedAt.UTC().Format(time.RFC3339),
+			"action": loginActionLabel(item.Action), "createdAt": item.CreatedAt.UTC().Format(time.RFC3339),
 		}
 	}
 	return rows

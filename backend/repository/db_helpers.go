@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var ErrNotFound = errors.New("not found")
+var ErrNotFound = errors.New("見つかりません")
 
 func mapRecordNotFound(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {

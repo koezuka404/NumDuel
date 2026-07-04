@@ -37,6 +37,6 @@ func wsErrorCode(err error) (code, message string) {
 		errors.Is(err, model.ErrDuplicateDigit):
 		return "validation_error", err.Error()
 	default:
-		return "internal_error", "internal server error"
+		return "internal_error", model.ErrInternal.Error()
 	}
 }

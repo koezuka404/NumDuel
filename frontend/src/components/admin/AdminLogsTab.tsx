@@ -1,6 +1,7 @@
 import type { ActivityLogDTO } from '../../types/dto';
-import DataTable from '../ui/DataTable';
 import { formatDateTime } from '../../lib/format';
+import { logTypeLabel } from '../../lib/labels';
+import DataTable from '../ui/DataTable';
 
 type Props = {
   logs: ActivityLogDTO[];
@@ -28,7 +29,7 @@ export default function AdminLogsTab({
           <option value="">すべて</option>
           {logTypes.map((type) => (
             <option key={type} value={type}>
-              {type}
+              {logTypeLabel(type)}
             </option>
           ))}
         </select>
@@ -36,12 +37,12 @@ export default function AdminLogsTab({
           検索
         </button>
         <button type="button" className="btn-secondary" onClick={onDownload}>
-          CSV DL
+          CSVダウンロード
         </button>
       </div>
       <DataTable
         columns={[
-          { key: 'logType', header: '種別', render: (row) => row.logType },
+          { key: 'logType', header: '種別', render: (row) => logTypeLabel(row.logType) },
           { key: 'detail', header: '詳細', render: (row) => row.detail },
           { key: 'createdAt', header: '日時', render: (row) => formatDateTime(row.createdAt) },
         ]}

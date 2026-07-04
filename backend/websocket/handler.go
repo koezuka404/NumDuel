@@ -81,7 +81,7 @@ func (h *Handler) Handle(c echo.Context) error {
 
 		if userID == uuid.Nil {
 			if msgType != "AUTH" {
-				h.writeError(conn, "unauthorized", "authentication required")
+				h.writeError(conn, "unauthorized", "認証が必要です")
 				continue
 			}
 			token := ""

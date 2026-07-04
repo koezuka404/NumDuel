@@ -6,6 +6,7 @@ import { useGameState } from './useGameState';
 import { useToast } from './useToast';
 import { useWebSocket } from './useWebSocket';
 import { validateFourDigits } from '../lib/validation';
+import { apiErrorMessage } from '../lib/labels';
 import type { GameOverData, GameStateDTO } from '../types/dto';
 
 const DEFAULT_TURN_SECONDS = 30;
@@ -87,7 +88,7 @@ export function useGamePage() {
       }
       if (msg.type === 'ERROR') {
         const code = String(msg.data?.code ?? '');
-        const message = String(msg.data?.message ?? 'エラーが発生しました');
+        const message = apiErrorMessage(code, String(msg.data?.message ?? ''));
         if (code === 'not_found' || code === 'forbidden') {
           showToast(message, 'error');
           navigate('/matching');

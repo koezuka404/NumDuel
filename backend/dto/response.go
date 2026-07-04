@@ -56,7 +56,7 @@ func mapHTTPError(err error) (int, string, string) {
 		errors.Is(err, model.ErrDuplicateDigit):
 		return http.StatusBadRequest, "validation_error", err.Error()
 	default:
-		return http.StatusInternalServerError, "internal_error", "internal server error"
+		return http.StatusInternalServerError, "internal_error", model.ErrInternal.Error()
 	}
 }
 

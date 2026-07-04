@@ -186,7 +186,7 @@ func TestWSOriginCheckAllowed(t *testing.T) {
 	sendWS(t, conn, map[string]string{"type": "PING"})
 	msg := readWSMessage(t, conn)
 	data, _ := msg["data"].(map[string]any)
-	if msg["type"] != "ERROR" || data["message"] != "authentication required" {
+	if msg["type"] != "ERROR" || data["message"] != "認証が必要です" {
 		t.Fatalf("message: %+v", msg)
 	}
 }
@@ -202,7 +202,7 @@ func TestWSOriginEmptyAllowedWhenRestricted(t *testing.T) {
 	sendWS(t, conn, map[string]string{"type": "PING"})
 	msg := readWSMessage(t, conn)
 	data, _ := msg["data"].(map[string]any)
-	if msg["type"] != "ERROR" || data["message"] != "authentication required" {
+	if msg["type"] != "ERROR" || data["message"] != "認証が必要です" {
 		t.Fatalf("message: %+v", msg)
 	}
 }

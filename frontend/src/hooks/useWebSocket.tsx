@@ -76,7 +76,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       }
       if (code === 'unauthorized') {
         disconnect();
-        window.location.href = '/login';
+        notifyUnauthorized();
       }
     },
     [disconnect],

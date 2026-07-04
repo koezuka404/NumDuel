@@ -12,7 +12,7 @@ var (
 	ErrForbidden          = model.ErrForbidden
 	ErrNotFound           = model.ErrNotFound
 	ErrDuplicateUser      = model.ErrDuplicateUser
-	ErrBadRequest         = errors.New("bad request")
+	ErrBadRequest         = errors.New("リクエストが不正です")
 	ErrTokenExpired       = model.ErrTokenExpired
 	ErrRateLimitExceeded  = model.ErrRateLimitExceeded
 	ErrUserInActiveGame   = model.ErrUserInActiveGame

@@ -16,7 +16,7 @@ function matchingStatusMessage(
   status: MatchingStatusDTO['status'],
 ): string {
   if (connecting) {
-    return 'WebSocket 接続中…';
+    return 'リアルタイム接続中…';
   }
   if (connected && status === 'idle') {
     return 'マッチングを開始できます';
@@ -73,7 +73,7 @@ export default function MatchingPage() {
         }
       }
       if (msg.type === 'RECONNECT_FAILED') {
-        showToast('WebSocket の再接続に失敗しました', 'error');
+        showToast('リアルタイム接続の再接続に失敗しました', 'error');
       }
     });
   }, [subscribe, goToGame, showToast]);
@@ -118,7 +118,7 @@ export default function MatchingPage() {
           </button>
         </div>
       </section>
-      {user?.role === 'master' && <FormError message="master アカウントはマッチングできません" />}
+      {user?.role === 'master' && <FormError message="管理者アカウントはマッチングできません" />}
     </AuthenticatedLayout>
   );
 }

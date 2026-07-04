@@ -10,15 +10,13 @@ import type {
   LoginHistoryItemDTO,
   MatchHistoryItemDTO,
   ProfileDTO,
-  WSHistoryItemDTO,
 } from '../types/dto';
 
-type ProfileTab = 'matches' | 'logins' | 'ws';
+type ProfileTab = 'matches' | 'logins';
 
 const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
   { id: 'matches', label: '勝敗履歴' },
   { id: 'logins', label: 'ログイン履歴' },
-  { id: 'ws', label: 'WS接続履歴' },
 ];
 
 const MATCH_COLUMNS: TableColumn<MatchHistoryItemDTO>[] = [
@@ -33,22 +31,11 @@ const LOGIN_COLUMNS: TableColumn<LoginHistoryItemDTO>[] = [
   { key: 'createdAt', header: '日時', render: (row) => formatDateTime(row.createdAt) },
 ];
 
-const WS_COLUMNS: TableColumn<WSHistoryItemDTO>[] = [
-  { key: 'connectionId', header: '接続ID', render: (row) => truncateId(row.connectionId) },
-  { key: 'connectedAt', header: '接続', render: (row) => formatDateTime(row.connectedAt) },
-  {
-    key: 'disconnectedAt',
-    header: '切断',
-    render: (row) => (row.disconnectedAt ? formatDateTime(row.disconnectedAt) : '-'),
-  },
-];
-
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileDTO | null>(null);
   const [tab, setTab] = useState<ProfileTab>('matches');
   const [matches, setMatches] = useState<MatchHistoryItemDTO[]>([]);
   const [logins, setLogins] = useState<LoginHistoryItemDTO[]>([]);
-  const [wsLogs, setWsLogs] = useState<WSHistoryItemDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,9 +54,6 @@ export default function ProfilePage() {
       apiData<{ items: LoginHistoryItemDTO[] }>('/me/login-history?page=1&limit=20').then((res) =>
         setLogins(res.items),
       );
-    }
-    if (tab === 'ws') {
-      apiData<{ items: WSHistoryItemDTO[] }>('/me/ws-history?page=1&limit=20').then((res) => setWsLogs(res.items));
     }
   }, [tab]);
 
@@ -92,9 +76,6 @@ export default function ProfilePage() {
       )}
       {tab === 'logins' && (
         <DataTable columns={LOGIN_COLUMNS} rows={logins} rowKey={(row, index) => `${row.action}-${row.createdAt}-${index}`} />
-      )}
-      {tab === 'ws' && (
-        <DataTable columns={WS_COLUMNS} rows={wsLogs} rowKey={(row) => row.connectionId} />
       )}
     </AuthenticatedLayout>
   );

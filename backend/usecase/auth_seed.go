@@ -39,7 +39,7 @@ func (a *AuthUseCase) SeedMaster(ctx context.Context, in SeedMasterInput) error 
 		return err
 	}
 	if dup {
-		return errors.New("master seed email or username already taken")
+		return errors.New("管理者のメールまたはユーザー名が既に使用されています")
 	}
 	hash, err := a.Passwords.Hash(in.Password)
 	if err != nil {

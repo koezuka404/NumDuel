@@ -24,7 +24,7 @@ export function validatePassword(password: string): string | null {
 
 export function validateUsername(username: string): string | null {
   if (!USERNAME_PATTERN.test(username)) {
-    return 'ユーザー名は3〜50文字の英数字とアンダースコアのみ使用できます';
+    return 'ユーザー名は3〜50文字の半角英字・数字とアンダースコアのみ使用できます';
   }
   return null;
 }

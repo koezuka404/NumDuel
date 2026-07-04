@@ -71,12 +71,6 @@ export type LoginHistoryItemDTO = {
   createdAt: string;
 };
 
-export type WSHistoryItemDTO = {
-  connectionId: string;
-  connectedAt: string;
-  disconnectedAt: string | null;
-};
-
 export type AdminUserDTO = {
   id: string;
   username: string;

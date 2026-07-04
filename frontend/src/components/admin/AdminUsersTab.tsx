@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import type { AdminUserDTO } from '../../types/dto';
+import { userRoleLabel } from '../../lib/labels';
 import DataTable from '../ui/DataTable';
 
 type Props = {
@@ -33,7 +34,7 @@ export default function AdminUsersTab({ users, searchQ, busy, onSearchQChange, o
         columns={[
           { key: 'username', header: 'ユーザー名', render: (row) => row.username },
           { key: 'email', header: 'メール', render: (row) => row.email },
-          { key: 'role', header: 'ロール', render: (row) => row.role },
+          { key: 'role', header: 'ロール', render: (row) => userRoleLabel(row.role) },
           { key: 'winCount', header: '勝利数', render: (row) => row.winCount },
           {
             key: 'actions',

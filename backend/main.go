@@ -89,7 +89,7 @@ func main() {
 	adminUC := usecase.NewAdminUseCase(dbSetup.Repos, rankingUC, sessionStore, redisStore, redisStore, redisStore, cfg.AdminLockTTL())
 	wsAuthUC := usecase.NewWSAuthUseCase(dbSetup.Repos, jwtService, redisStore, redisStore, hub)
 	autoLogoutUC := usecase.NewAutoLogoutUseCase(dbSetup.Repos, redisStore, func(ctx context.Context, userID uuid.UUID) error {
-		return sessionStore.DisconnectWithError(ctx, userID, "unauthorized", "invalid credentials")
+		return sessionStore.DisconnectWithError(ctx, userID, "unauthorized", "認証に失敗しました")
 	}, cfg.SessionTimeout())
 	backupUC := usecase.NewBackupUseCase(dbSetup.Syncer, redisStore, 0)
 	logRetentionUC := usecase.NewLogRetentionUseCase(

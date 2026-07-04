@@ -109,7 +109,7 @@ func finishGame(game *model.Game, winnerID uuid.UUID, now time.Time) error {
 		return ErrGameAlreadyFinished
 	}
 	if winnerID != game.Player1ID && winnerID != game.Player2ID {
-		return errors.New("winner is not a participant")
+		return errors.New("勝者が参加者ではありません")
 	}
 	game.Status = model.GameStatusFinished
 	game.WinnerID = &winnerID

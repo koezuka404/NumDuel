@@ -47,7 +47,7 @@ func (g *GameUseCase) HandleTimeout(ctx context.Context, gameID, playerID uuid.U
 		return nil
 	}
 	if g.Random == nil {
-		return errors.New("random number generator is not configured")
+		return errors.New("乱数生成器が設定されていません")
 	}
 	guessNum, err := g.Random.GenerateGuessNumber()
 	if err != nil {
