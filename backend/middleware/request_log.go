@@ -16,6 +16,8 @@ import (
 	"github.com/numduel/numduel/repository"
 )
 
+var marshalRequestLogDetail = json.Marshal
+
 //RequestLogConfigはRequestLogの依存関係
 type RequestLogConfig struct {
 	Repo repository.Repos
@@ -43,7 +45,7 @@ func RequestLog(cfg RequestLogConfig) echo.MiddlewareFunc {
 				uid := auth.UserID
 				userID = &uid
 			}
-			detail, marshalErr := json.Marshal(map[string]any{
+			detail, marshalErr := marshalRequestLogDetail(map[string]any{
 				"method":     c.Request().Method,
 				"path":       c.Path(),
 				"status":     status,

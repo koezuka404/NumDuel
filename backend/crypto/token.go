@@ -15,6 +15,10 @@ import (
 	"github.com/numduel/numduel/usecase"
 )
 
+var refreshRandReadFn = rand.Read
+
+var jwtParseWithClaimsFn = jwt.ParseWithClaims
+
 type JWTService struct {
 	secret        []byte
 	expiryMinutes int
@@ -65,7 +69,7 @@ type AccessToken struct {
 
 func (s *JWTService) Parse(tokenString string) (*usecase.AccessTokenClaims, error) {
 	claims := &accessClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
+	token, err := jwtParseWithClaimsFn(tokenString, claims, func(t *jwt.Token) (any, error) {
 		if t.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
@@ -109,7 +113,7 @@ func (s *RefreshTokenService) Hash(plaintext string) string {
 
 func (s *RefreshTokenService) Generate() (usecase.RefreshTokenPair, error) {
 	buf := make([]byte, 64)
-	if _, err := rand.Read(buf); err != nil {
+	if _, err := refreshRandReadFn(buf); err != nil {
 		return usecase.RefreshTokenPair{}, err
 	}
 	plaintext := hex.EncodeToString(buf)

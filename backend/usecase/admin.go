@@ -177,8 +177,7 @@ func (a *AdminUseCase) DownloadActivityLogsCSV(ctx context.Context, adminID uuid
 			sanitizeCSVCell(l.CreatedAt.UTC().Format(time.RFC3339)),
 		})
 	}
-	w.Flush()
-	if err := w.Error(); err != nil {
+	if err := flushCSVWriter(w); err != nil {
 		return nil, fmt.Errorf("failed to generate csv: %w", err)
 	}
 	return buf.Bytes(), nil
@@ -211,6 +210,11 @@ func (a *AdminUseCase) GetBackupStatus(ctx context.Context) (*BackupStatusOutput
 type BackupStatusOutput struct {
 	LastSyncedAt *time.Time
 	Status       string
+}
+
+var flushCSVWriter = func(w *csv.Writer) error {
+	w.Flush()
+	return w.Error()
 }
 
 func sanitizeCSVCell(value string) string {

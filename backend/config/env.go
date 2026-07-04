@@ -58,7 +58,7 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		JWTExpiryMinutes:       envInt(getenv, "JWT_EXPIRY_MINUTES", 60),
 		RefreshTokenExpiryDays: envInt(getenv, "REFRESH_TOKEN_EXPIRY_DAYS", 7),
 		CookieSecure:           envBool(getenv, "COOKIE_SECURE", false),
-		Port:                   envInt(getenv, "PORT", 8080),
+		Port:                   envInt(getenv, "PORT", 8090),
 		GameSecretPepper:       getenv("GAME_SECRET_PEPPER"),
 		GameLockSeconds:        envInt(getenv, "GAME_LOCK_SECONDS", 2),
 		AdminLockSeconds:       envInt(getenv, "ADMIN_LOCK_SECONDS", 5),

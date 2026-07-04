@@ -16,10 +16,15 @@ func NewRandomNumberService() *RandomNumberService {
 	return &RandomNumberService{}
 }
 
+var (
+	guessRandIntFn = randInt
+	intRandFn      = rand.Int
+)
+
 func (s *RandomNumberService) GenerateGuessNumber() (string, error) {
 	pool := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	for i := 0; i < 4; i++ {
-		j, err := randInt(i, len(pool)-1)
+		j, err := guessRandIntFn(i, len(pool)-1)
 		if err != nil {
 			return "", err
 		}
@@ -32,7 +37,7 @@ func randInt(min, max int) (int, error) {
 	if max < min {
 		return 0, fmt.Errorf("invalid random range")
 	}
-	n, err := rand.Int(rand.Reader, big.NewInt(int64(max-min+1)))
+	n, err := intRandFn(rand.Reader, big.NewInt(int64(max-min+1)))
 	if err != nil {
 		return 0, err
 	}

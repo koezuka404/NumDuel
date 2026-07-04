@@ -93,8 +93,7 @@ func (r *userRepo) Search(ctx context.Context, query string, page, limit int) ([
 	pattern := "%" + query + "%"
 	limit, offset := paginatePage(page, limit)
 	var total int64
-	q := r.dbCtx(ctx).Model(&model.User{}).
-		Where("username ILIKE ? OR email ILIKE ?", pattern, pattern)
+	q := userSearchScope(r.dbCtx(ctx), pattern)
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -108,6 +107,16 @@ func (r *userRepo) Search(ctx context.Context, query string, page, limit int) ([
 		out[i] = &row
 	}
 	return out, total, nil
+}
+
+var isPostgresDialect = func(name string) bool { return name == "postgres" }
+
+func userSearchScope(db *gorm.DB, pattern string) *gorm.DB {
+	q := db.Model(&model.User{})
+	if isPostgresDialect(db.Dialector.Name()) {
+		return q.Where("username ILIKE ? OR email ILIKE ?", pattern, pattern)
+	}
+	return q.Where("lower(username) LIKE lower(?) OR lower(email) LIKE lower(?)", pattern, pattern)
 }
 
 func (r *userRepo) FindUpdatedSince(ctx context.Context, since time.Time) ([]*model.User, error) {

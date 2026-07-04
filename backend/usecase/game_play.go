@@ -59,9 +59,9 @@ func (g *GameUseCase) SetSecretNumber(ctx context.Context, userID, gameID uuid.U
 		default:
 			return ErrBadRequest
 		}
-		slot, err := gamePlayerSlot(game, userID)
-		if err != nil {
-			return err
+		slot := 1
+		if userID == game.Player2ID {
+			slot = 2
 		}
 		hash, err := g.Secrets.Hash(secretDigits, gameID, slot)
 		if err != nil {
@@ -128,9 +128,11 @@ func (g *GameUseCase) SubmitGuess(ctx context.Context, userID, gameID uuid.UUID,
 		if !game.IsParticipant(userID) {
 			return ErrForbidden
 		}
-		opponentHash, opponentSlot, err := gameOpponentSecretHash(game, userID)
-		if err != nil {
-			return err
+		opponentHash := game.Player2Secret
+		opponentSlot := 2
+		if userID == game.Player2ID {
+			opponentHash = game.Player1Secret
+			opponentSlot = 1
 		}
 		if opponentHash == "" {
 			return ErrBadRequest

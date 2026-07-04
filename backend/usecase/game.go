@@ -146,9 +146,9 @@ func (g *GameUseCase) buildGameState(ctx context.Context, userID, gameID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	opponentID, err := gameOpponentID(game, userID)
-	if err != nil {
-		return nil, err
+	opponentID := game.Player2ID
+	if userID == game.Player2ID {
+		opponentID = game.Player1ID
 	}
 	oppCount, err := g.Guesses.CountByGameExcludingPlayer(ctx, gameID, opponentID)
 	if err != nil {

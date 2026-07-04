@@ -8,6 +8,8 @@ import (
 
 const bcryptCost = 12
 
+var generateFromPasswordFn = bcrypt.GenerateFromPassword
+
 type PasswordService struct{}
 
 var _ usecase.IPasswordHasher = (*PasswordService)(nil)
@@ -17,7 +19,7 @@ func NewPasswordService() *PasswordService {
 }
 
 func (s *PasswordService) Hash(password string) (string, error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	b, err := generateFromPasswordFn([]byte(password), bcryptCost)
 	if err != nil {
 		return "", err
 	}

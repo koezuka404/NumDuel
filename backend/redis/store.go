@@ -24,6 +24,8 @@ return 0
 	forceLogoutTTL = 30 * 24 * time.Hour
 )
 
+var marshalJSON = json.Marshal
+
 type Store struct {
 	rdb *goredis.Client
 }
@@ -94,7 +96,7 @@ func (s *Store) SetTurn(ctx context.Context, gameID uuid.UUID, turn int, playerI
 		StartedAt: startedAt.UTC(),
 		ExpiresAt: expiresAt.UTC(),
 	}
-	b, err := json.Marshal(payload)
+	b, err := marshalJSON(payload)
 	if err != nil {
 		return err
 	}
@@ -258,7 +260,7 @@ func (s *Store) SetBackupStatus(ctx context.Context, status string, lastSyncedAt
 	if !lastSyncedAt.IsZero() {
 		payload["lastSyncedAt"] = lastSyncedAt.UTC().Format(time.RFC3339)
 	}
-	raw, err := json.Marshal(payload)
+	raw, err := marshalJSON(payload)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,10 @@
 
 # Go
 backend/bin/
+backend/numduel
+backend/.gomodcache/
 backend/coverage.out
+backend/cov_ok.out
 backend/*.test
 
 # Node
