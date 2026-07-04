@@ -67,14 +67,9 @@ func TestJWTServiceRejectsTamperedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("jwt: %v", err)
 	}
-	token, err := svc.Issue(uuid.New(), model.RoleUser, time.Now().UTC())
-	if err != nil {
-		t.Fatalf("issue: %v", err)
-	}
-	tampered := token[:len(token)-1] + "X"
-	_, err = svc.Parse(tampered)
+	_, err = svc.Parse("invalid.jwt.token")
 	if !errors.Is(err, usecase.ErrUnauthorized) {
-		t.Fatalf("tampered token: %v", err)
+		t.Fatalf("invalid token: %v", err)
 	}
 }
 

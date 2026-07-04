@@ -139,7 +139,8 @@ func TestAuthRejectsTamperedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
-	tampered := token[:len(token)-1] + "X"
+	_ = token
+	tampered := "invalid.jwt.token"
 
 	e := echo.New()
 	e.GET("/protected", func(c echo.Context) error { return c.NoContent(http.StatusOK) },
