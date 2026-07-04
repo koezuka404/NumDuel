@@ -31,6 +31,22 @@ func TestStartMatchingWaiting(t *testing.T) {
 	}
 }
 
+func TestMatchTwoPlayersStartReturnsMatched(t *testing.T) {
+	_, repos := testutil.OpenSQLiteDB(t)
+	match := testutil.NewMatchingUC(repos)
+	a := testutil.CreateUser(t, repos, "alice", "alice@test.local", "password123")
+	b := testutil.CreateUser(t, repos, "bob", "bob@test.local", "password123")
+
+	outA, err := match.Start(context.Background(), a.ID)
+	if err != nil || outA.Status != "waiting" || outA.GameID != nil {
+		t.Fatalf("alice start: %+v err=%v", outA, err)
+	}
+	outB, err := match.Start(context.Background(), b.ID)
+	if err != nil || outB.Status != "matched" || outB.GameID == nil {
+		t.Fatalf("bob start: %+v err=%v", outB, err)
+	}
+}
+
 func TestMatchTwoPlayers(t *testing.T) {
 	_, repos := testutil.OpenSQLiteDB(t)
 	match := testutil.NewMatchingUC(repos)

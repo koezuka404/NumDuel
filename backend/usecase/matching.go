@@ -35,6 +35,7 @@ func (m *MatchingUseCase) now() time.Time {
 
 type StartMatchingOutput struct {
 	Status string
+	GameID *uuid.UUID
 }
 
 type CancelMatchingOutput struct {
@@ -92,6 +93,10 @@ func (m *MatchingUseCase) Start(ctx context.Context, userID uuid.UUID) (*StartMa
 		payload := map[string]any{"gameId": matched.ID.String()}
 		_ = m.Notifier.SendToUser(ctx, matched.Player1ID, "MATCHED", payload)
 		_ = m.Notifier.SendToUser(ctx, matched.Player2ID, "MATCHED", payload)
+	}
+	if matched != nil {
+		id := matched.ID
+		return &StartMatchingOutput{Status: "matched", GameID: &id}, nil
 	}
 	return &StartMatchingOutput{Status: "waiting"}, nil
 }

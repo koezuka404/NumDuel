@@ -134,8 +134,12 @@ func backupStatusResponse(out *usecase.BackupStatusOutput) map[string]any {
 	return data
 }
 
-func startMatchingResponse(out *usecase.StartMatchingOutput) map[string]string {
-	return map[string]string{"status": out.Status}
+func startMatchingResponse(out *usecase.StartMatchingOutput) map[string]any {
+	data := map[string]any{"status": out.Status, "gameId": nil}
+	if out.GameID != nil {
+		data["gameId"] = out.GameID.String()
+	}
+	return data
 }
 
 func cancelMatchingResponse(out *usecase.CancelMatchingOutput) map[string]string {

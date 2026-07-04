@@ -12,26 +12,36 @@ import type { MatchingStatusDTO } from '../types/dto';
 
 function matchingStatusMessage(
   connecting: boolean,
-  connected: boolean,
   status: MatchingStatusDTO['status'],
 ): string {
-  if (connecting) {
-    return 'リアルタイム接続中…';
-  }
-  if (connected && status === 'idle') {
-    return 'マッチングを開始できます';
-  }
   if (status === 'waiting') {
     return '対戦相手を探しています…';
   }
+  if (status === 'idle') {
+    if (connecting) {
+      return 'リアルタイム接続中…';
+    }
+    return 'マッチングを開始できます';
+  }
   return '';
+}
+
+function applyMatchingStatus(
+  res: MatchingStatusDTO,
+  goToGame: (gameId: string) => void,
+  setStatus: (status: MatchingStatusDTO['status']) => void,
+) {
+  setStatus(res.status);
+  if (res.status === 'matched' && res.gameId) {
+    goToGame(res.gameId);
+  }
 }
 
 export default function MatchingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const { subscribe, connected, connecting } = useWebSocket();
+  const { subscribe, connecting } = useWebSocket();
   const { busy, run } = useAsyncAction();
   const [status, setStatus] = useState<MatchingStatusDTO['status']>('idle');
 
@@ -80,19 +90,26 @@ export default function MatchingPage() {
 
   useEffect(() => {
     apiData<MatchingStatusDTO>('/matching/status')
-      .then((res) => {
-        setStatus(res.status);
-        if (res.status === 'matched' && res.gameId) {
-          goToGame(res.gameId);
-        }
-      })
+      .then((res) => applyMatchingStatus(res, goToGame, setStatus))
       .catch(() => undefined);
   }, [goToGame]);
 
+  useEffect(() => {
+    if (status !== 'waiting') {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void apiData<MatchingStatusDTO>('/matching/status')
+        .then((res) => applyMatchingStatus(res, goToGame, setStatus))
+        .catch(() => undefined);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [status, goToGame]);
+
   const startMatching = () =>
     run(async () => {
-      const res = await apiData<{ status: string }>('/matching/start', { method: 'POST' });
-      setStatus(res.status as MatchingStatusDTO['status']);
+      const res = await apiData<MatchingStatusDTO>('/matching/start', { method: 'POST' });
+      applyMatchingStatus(res, goToGame, setStatus);
     }, handleMatchingError);
 
   const cancelMatching = () =>
@@ -101,7 +118,7 @@ export default function MatchingPage() {
       setStatus(res.status as MatchingStatusDTO['status']);
     });
 
-  const statusMessage = matchingStatusMessage(connecting, connected, status);
+  const statusMessage = matchingStatusMessage(connecting, status);
 
   return (
     <AuthenticatedLayout links={NAV.matching}>
