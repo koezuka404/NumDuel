@@ -21,8 +21,8 @@ func TestAdminEndpoints(t *testing.T) {
 	}
 
 	rec = env.do(t, http.MethodGet, "/api/admin/users/search?q=ali", adminCookies, nil)
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("search users on sqlite status %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("search users status %d: %s", rec.Code, rec.Body.String())
 	}
 
 	rec = env.do(t, http.MethodPost, "/api/admin/ranking/rebuild", adminCookies, nil)

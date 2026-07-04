@@ -9,6 +9,7 @@ backend/numduel
 backend/.gomodcache/
 backend/coverage.out
 backend/cov_ok.out
+backend/*.out
 backend/*.test
 
 # Node
@@ -20,3 +21,4 @@ frontend/dist/
 .vscode/
 *.swp
 .DS_Store
+**/.DS_Store

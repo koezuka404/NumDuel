@@ -9,18 +9,6 @@ export default defineConfig({
     passWithNoTests: true,
     testTimeout: 10_000,
     hookTimeout: 10_000,
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'text-summary'],
-      include: ['src/**/*.{ts,tsx}'],
-      exclude: [
-        'src/**/*.test.{ts,tsx}',
-        'src/test/**',
-        'src/vite-env.d.ts',
-        'src/main.tsx',
-        'src/types/**',
-      ],
-    },
   },
   server: {
     port: 5173,
