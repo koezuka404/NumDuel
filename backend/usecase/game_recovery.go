@@ -32,7 +32,7 @@ func (g *GameUseCase) CancelBySecretTimeout(ctx context.Context, gameID uuid.UUI
 		if !now.After(deadline) {
 			return nil
 		}
-		cancelGameBySecretTimeout(game, now)
+		_ = cancelGameBySecretTimeout(game, now)
 		if err := g.Games.Update(ctx, game); err != nil {
 			return err
 		}

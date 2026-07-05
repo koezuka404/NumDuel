@@ -61,7 +61,7 @@ func (h *Handler) Handle(c echo.Context) error {
 		select {
 		case <-authCh:
 		default:
-			conn.Close()
+			_ = conn.Close()
 		}
 	}()
 
