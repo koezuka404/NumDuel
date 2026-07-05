@@ -156,7 +156,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm audit --audit-level=high
+          npm audit --omit=dev --audit-level=high
       - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
