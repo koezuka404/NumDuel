@@ -242,7 +242,6 @@ jobs:
         run: go run ./migrations/migrate.go
 
   smoke-test:
-    smoke-test:
     name: Smoke Test (API)
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
     needs: [container-build, security-scan, publish-images, production-migrate]
@@ -396,4 +395,3 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
-
