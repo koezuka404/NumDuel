@@ -214,7 +214,7 @@ func (s *Store) GetForceLogoutBefore(ctx context.Context, userID uuid.UUID) (tim
 	}
 	sec, err := strconv.ParseInt(val, 10, 64)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, nil
 	}
 	return time.Unix(sec, 0).UTC(), nil
 }

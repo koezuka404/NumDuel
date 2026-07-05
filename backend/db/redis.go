@@ -51,6 +51,7 @@ func OpenRedis(required bool) (*redis.Client, error) {
 			DB:       dbNum,
 		}
 	}
+	applyRedisClientDefaults(opts)
 	rdb = redis.NewClient(opts)
 	ctxPing, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -66,4 +67,34 @@ func PingRedis(ctx context.Context, rdb *redis.Client) error {
 		return nil
 	}
 	return rdb.Ping(ctx).Err()
+}
+
+func applyRedisClientDefaults(opts *redis.Options) {
+	if opts == nil {
+		return
+	}
+	if opts.DialTimeout == 0 {
+		opts.DialTimeout = 5 * time.Second
+	}
+	if opts.ReadTimeout == 0 {
+		opts.ReadTimeout = 3 * time.Second
+	}
+	if opts.WriteTimeout == 0 {
+		opts.WriteTimeout = 3 * time.Second
+	}
+	if opts.PoolTimeout == 0 {
+		opts.PoolTimeout = 4 * time.Second
+	}
+	if opts.MaxRetries == 0 {
+		opts.MaxRetries = 3
+	}
+	if opts.MinRetryBackoff == 0 {
+		opts.MinRetryBackoff = 100 * time.Millisecond
+	}
+	if opts.MaxRetryBackoff == 0 {
+		opts.MaxRetryBackoff = 2 * time.Second
+	}
+	if opts.PoolSize == 0 {
+		opts.PoolSize = 10
+	}
 }

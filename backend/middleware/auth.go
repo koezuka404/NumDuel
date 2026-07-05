@@ -2,11 +2,16 @@
 package middleware
 
 import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
-	"github.com/numduel/numduel/repository"
 	infrcrypto "github.com/numduel/numduel/crypto"
 	"github.com/numduel/numduel/dto"
+	"github.com/numduel/numduel/repository"
 	"github.com/numduel/numduel/usecase"
 )
 
@@ -29,7 +34,7 @@ func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 				return dto.WriteError(c, err)
 			}
 			if cfg.Revoker != nil {
-				revoked, err := cfg.Revoker.IsRevoked(c.Request().Context(), token.JTI)
+				revoked, err := authCheckRevoked(c.Request().Context(), cfg.Revoker, token.JTI)
 				if err != nil {
 					return dto.WriteError(c, err)
 				}
@@ -38,7 +43,7 @@ func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 				}
 			}
 			if cfg.ForceLogout != nil && !token.IssuedAt.IsZero() {
-				before, err := cfg.ForceLogout.GetForceLogoutBefore(c.Request().Context(), token.UserID)
+				before, err := authForceLogoutBefore(c.Request().Context(), cfg.ForceLogout, token.UserID)
 				if err != nil {
 					return dto.WriteError(c, err)
 				}
@@ -61,4 +66,22 @@ func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
+}
+
+func authCheckRevoked(ctx context.Context, revoker usecase.IJWTRevoker, jti string) (bool, error) {
+	revoked, err := revoker.IsRevoked(ctx, jti)
+	if err != nil {
+		log.Printf("auth: IsRevoked degraded (redis unavailable): %v", err)
+		return false, nil
+	}
+	return revoked, nil
+}
+
+func authForceLogoutBefore(ctx context.Context, store usecase.IForceLogoutStore, userID uuid.UUID) (time.Time, error) {
+	before, err := store.GetForceLogoutBefore(ctx, userID)
+	if err != nil {
+		log.Printf("auth: GetForceLogoutBefore degraded (redis unavailable): %v", err)
+		return time.Time{}, nil
+	}
+	return before, nil
 }

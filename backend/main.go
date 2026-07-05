@@ -135,6 +135,11 @@ func main() {
 				"error": map[string]string{"code": "internal_error", "message": "database unavailable"},
 			})
 		}
+		if err := db.PingRedis(pingCtx, rdb); err != nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]any{
+				"error": map[string]string{"code": "internal_error", "message": "redis unavailable"},
+			})
+		}
 		return c.JSON(http.StatusOK, map[string]any{"data": map[string]string{"status": "ok"}})
 	})
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	infrcrypto "github.com/numduel/numduel/crypto"
@@ -152,6 +153,52 @@ func TestAuthRejectsTamperedToken(t *testing.T) {
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("tampered token status %d", rec.Code)
+	}
+}
+
+type failingJWTRevoker struct{}
+
+func (failingJWTRevoker) Revoke(context.Context, string, time.Duration) error { return nil }
+
+func (failingJWTRevoker) IsRevoked(context.Context, string) (bool, error) {
+	return false, context.DeadlineExceeded
+}
+
+type failingForceLogoutStore struct{}
+
+func (failingForceLogoutStore) GetForceLogoutBefore(context.Context, uuid.UUID) (time.Time, error) {
+	return time.Time{}, context.DeadlineExceeded
+}
+
+func (failingForceLogoutStore) SetForceLogoutBefore(context.Context, uuid.UUID, time.Time) error {
+	return nil
+}
+
+func TestAuthAllowsRequestWhenRedisUnavailable(t *testing.T) {
+	_, repos := testutil.OpenSQLiteDB(t)
+	jwtSvc, err := infrcrypto.NewJWTService(testutil.TestJWTSecret, 60)
+	if err != nil {
+		t.Fatalf("jwt: %v", err)
+	}
+	user := testutil.CreateUser(t, repos, "alice", "alice@test.local", "password123")
+	token, err := jwtSvc.Issue(user.ID, user.Role, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("issue: %v", err)
+	}
+
+	e := echo.New()
+	e.GET("/protected", func(c echo.Context) error { return c.NoContent(http.StatusOK) },
+		middleware.Auth(middleware.AuthConfig{
+			JWT: jwtSvc, Revoker: failingJWTRevoker{},
+			ForceLogout: failingForceLogoutStore{}, Repo: repos,
+		}))
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.AddCookie(&http.Cookie{Name: middleware.AccessCookieName, Value: token})
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("degraded auth status %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -197,8 +197,8 @@ func TestGetForceLogoutBeforeInvalidValue(t *testing.T) {
 	userID := uuid.New()
 	mr.Set(forceLogoutKey(userID), "not-a-number")
 
-	if _, err := store.GetForceLogoutBefore(ctx, userID); err == nil {
-		t.Fatal("expected parse error")
+	if _, err := store.GetForceLogoutBefore(ctx, userID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

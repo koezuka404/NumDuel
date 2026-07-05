@@ -94,45 +94,15 @@ func (h *AuthController) Logout(c echo.Context) error {
 }
 
 func (h *AuthController) setAuthCookies(c echo.Context, accessToken, refreshToken string) {
-	c.SetCookie(&http.Cookie{
-		Name:     middleware.AccessCookieName,
-		Value:    accessToken,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		MaxAge:   h.JWTExpiryMinutes * 60,
-	})
-
-	c.SetCookie(&http.Cookie{
-		Name:     middleware.RefreshCookieName,
-		Value:    refreshToken,
-		Path:     "/api/auth/refresh",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		MaxAge:   h.RefreshTokenExpiryDays * 86400,
-	})
+	c.SetCookie(newAuthCookie(
+		middleware.AccessCookieName, accessToken, "/", h.JWTExpiryMinutes*60,
+	))
+	c.SetCookie(newAuthCookie(
+		middleware.RefreshCookieName, refreshToken, "/api/auth/refresh", h.RefreshTokenExpiryDays*86400,
+	))
 }
 
 func (h *AuthController) clearAuthCookies(c echo.Context) {
-	c.SetCookie(&http.Cookie{
-		Name:     middleware.AccessCookieName,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		MaxAge:   -1,
-	})
-
-	c.SetCookie(&http.Cookie{
-		Name:     middleware.RefreshCookieName,
-		Value:    "",
-		Path:     "/api/auth/refresh",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		MaxAge:   -1,
-	})
+	c.SetCookie(newAuthCookie(middleware.AccessCookieName, "", "/", -1))
+	c.SetCookie(newAuthCookie(middleware.RefreshCookieName, "", "/api/auth/refresh", -1))
 }
