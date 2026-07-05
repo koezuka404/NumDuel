@@ -86,8 +86,13 @@ func TestGetLoginHistory(t *testing.T) {
 	}
 
 	items, total, err := profile.GetLoginHistory(context.Background(), user.ID, 1, 10)
-	if err != nil || total != 1 || len(items) != 1 || items[0].Action != model.LoginActionLogin {
+	if err != nil || total != 2 || len(items) != 2 {
 		t.Fatalf("login history: items=%+v total=%d err=%v", items, total, err)
+	}
+	for _, item := range items {
+		if item.Action != model.LoginActionLogin {
+			t.Fatalf("unexpected action: %+v", item)
+		}
 	}
 }
 
