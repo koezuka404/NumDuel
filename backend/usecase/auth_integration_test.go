@@ -18,7 +18,7 @@ func TestRegisterUser(t *testing.T) {
 	out, err := auth.Register(context.Background(), usecase.RegisterInput{
 		Username: "alice", Email: "alice@test.local", Password: "password123",
 	})
-	if err != nil || out.Username != "alice" {
+	if err != nil || out.Username != "alice" || out.AccessToken == "" || out.RefreshToken == "" {
 		t.Fatalf("register: out=%+v err=%v", out, err)
 	}
 

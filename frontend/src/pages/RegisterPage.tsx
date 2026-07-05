@@ -1,13 +1,16 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ApiError, apiFetch } from '../api/client';
+import { ApiError } from '../api/client';
 import AppShell from '../components/layout/AppShell';
 import FormField, { FormError } from '../components/ui/FormField';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { homePathForRole } from '../lib/routes';
 import { validatePassword, validateRegisterEmail, validateUsername } from '../lib/validation';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const { showToast } = useToast();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -36,12 +39,9 @@ export default function RegisterPage() {
     setSubmitting(true);
     setFormError('');
     try {
-      await apiFetch('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ username, email, password }),
-      });
+      const user = await register(username, email, password);
       showToast('登録完了', 'success');
-      navigate('/login');
+      navigate(homePathForRole(user.role));
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'rate_limit_exceeded') {

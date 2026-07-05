@@ -46,7 +46,8 @@ func (h *AuthController) Register(c echo.Context) error {
 	if err != nil {
 		return dto.WriteError(c, err)
 	}
-	return dto.WriteData(c, http.StatusCreated, registerUserResponse(out))
+	h.setAuthCookies(c, out.AccessToken, out.RefreshToken)
+	return dto.WriteData(c, http.StatusCreated, loginResponse(out))
 }
 
 func (h *AuthController) Login(c echo.Context) error {
@@ -91,6 +92,18 @@ func (h *AuthController) Logout(c echo.Context) error {
 	}
 	h.clearAuthCookies(c)
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *AuthController) Session(c echo.Context) error {
+	auth, ok := middleware.AuthFrom(c)
+	if !ok {
+		return dto.WriteData(c, http.StatusOK, nil)
+	}
+	out, err := h.Auth.GetMe(c.Request().Context(), auth.UserID)
+	if err != nil {
+		return dto.WriteData(c, http.StatusOK, nil)
+	}
+	return dto.WriteData(c, http.StatusOK, getMeResponse(out))
 }
 
 func (h *AuthController) setAuthCookies(c echo.Context, accessToken, refreshToken string) {

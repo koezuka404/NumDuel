@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { apiData, apiFetch, setOnUnauthorized } from '../api/client';
+import { fetchSession, apiFetch, setOnUnauthorized } from '../api/client';
 import type { ApiDataResponse, AuthUser } from '../types/dto';
 
 type AuthContextValue = {
@@ -15,6 +15,7 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
+  register: (username: string, email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
 };
@@ -27,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const me = await apiData<AuthUser>('/me');
+      const me = await fetchSession();
       setUser(me);
       return me;
     } catch {
@@ -63,6 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.data;
   }, []);
 
+  const register = useCallback(async (username: string, email: string, password: string) => {
+    const res = await apiFetch<ApiDataResponse<AuthUser>>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, email, password }),
+    });
+    setUser(res.data);
+    return res.data;
+  }, []);
+
   const logout = useCallback(async () => {
     await apiFetch('/auth/logout', { method: 'POST' });
     setUser(null);
@@ -74,10 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       isLoading,
       login,
+      register,
       logout,
       refreshUser,
     }),
-    [user, isLoading, login, logout, refreshUser],
+    [user, isLoading, login, register, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

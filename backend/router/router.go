@@ -38,6 +38,7 @@ func Register(e *echo.Echo, deps Deps) {
 	api.POST("/auth/register", auth.Register)
 	api.POST("/auth/login", auth.Login)
 	api.POST("/auth/refresh", auth.Refresh)
+	api.GET("/auth/session", auth.Session, middleware.TryAuth(deps.AuthMW))
 
 	protected := api.Group("",
 		middleware.Auth(deps.AuthMW),

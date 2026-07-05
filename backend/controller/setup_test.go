@@ -53,6 +53,7 @@ func setupCtrlEnv(t *testing.T) *ctrlEnv {
 	api.POST("/auth/register", auth.Register)
 	api.POST("/auth/login", auth.Login)
 	api.POST("/auth/refresh", auth.Refresh)
+	api.GET("/auth/session", auth.Session, middleware.TryAuth(middleware.AuthConfig{JWT: jwtSvc, Repo: repos}))
 
 	protected := api.Group("", middleware.Auth(middleware.AuthConfig{JWT: jwtSvc, Repo: repos}))
 	protected.POST("/auth/logout", auth.Logout)

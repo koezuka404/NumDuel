@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {  apiData, apiFetch, downloadUrl, notifyUnauthorized, setOnUnauthorized } from './client';
+import {  apiData, apiFetch, downloadUrl, fetchSession, notifyUnauthorized, setOnUnauthorized } from './client';
 
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   vi.stubGlobal(
@@ -132,5 +132,28 @@ describe('apiFetch', () => {
   it('notifyUnauthorized is safe without handler', () => {
     setOnUnauthorized(null);
     expect(() => notifyUnauthorized()).not.toThrow();
+  });
+});
+
+describe('fetchSession', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns null on 401 without notifyUnauthorized', async () => {
+    const handler = vi.fn();
+    setOnUnauthorized(handler);
+    mockFetch({ status: 401, ok: false });
+    await expect(fetchSession()).resolves.toBeNull();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns user data on 200', async () => {
+    mockFetch({
+      status: 200,
+      ok: true,
+      json: async () => ({ data: { id: '1', username: 'alice', role: 'user' } }),
+    });
+    await expect(fetchSession()).resolves.toEqual({ id: '1', username: 'alice', role: 'user' });
   });
 });

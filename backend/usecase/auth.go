@@ -13,7 +13,7 @@ import (
 
 //Register/Login/Refresh/Logout/Meを扱う認証ユースケース。
 type IAuthUsecase interface {
-	Register(ctx context.Context, in RegisterInput) (*RegisterResult, error)
+	Register(ctx context.Context, in RegisterInput) (*LoginResult, error)
 	Login(ctx context.Context, in LoginInput) (*LoginResult, error)
 	Refresh(ctx context.Context, in RefreshInput) (*RefreshResult, error)
 	Logout(ctx context.Context, in LogoutInput) error

@@ -1,21 +1,32 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, apiFetch } from '../api/client';
+import { ApiError } from '../api/client';
 import { ToastProvider } from '../hooks/useToast';
 import RegisterPage from './RegisterPage';
 
 const navigate = vi.fn();
-const apiFetchMock = vi.fn();
+const registerMock = vi.fn();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useNavigate: () => navigate };
 });
 
-vi.mock('../api/client', async () => {
-  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
-  return { ...actual, apiFetch: (...args: Parameters<typeof apiFetch>) => apiFetchMock(...args) };
+vi.mock('../hooks/useAuth', async () => {
+  const actual = await vi.importActual<typeof import('../hooks/useAuth')>('../hooks/useAuth');
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: vi.fn(),
+      register: registerMock,
+      logout: vi.fn(),
+      refreshUser: vi.fn(),
+    }),
+  };
 });
 
 function renderPage() {
@@ -39,7 +50,7 @@ describe('RegisterPage', () => {
   afterEach(() => {
     cleanup();
     navigate.mockReset();
-    apiFetchMock.mockReset();
+    registerMock.mockReset();
   });
 
   it('shows validation error for short username', async () => {
@@ -50,16 +61,17 @@ describe('RegisterPage', () => {
     await waitFor(() => expect(screen.getByText(/3〜50文字/)).toBeInTheDocument());
   });
 
-  it('registers successfully', async () => {
-    apiFetchMock.mockResolvedValueOnce(undefined);
+  it('registers and navigates to matching', async () => {
+    registerMock.mockResolvedValueOnce({ id: '1', username: 'alice', role: 'user' });
     renderPage();
     fillValidForm();
     fireEvent.click(screen.getByRole('button', { name: '登録' }));
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/login'));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/matching'));
+    expect(registerMock).toHaveBeenCalledWith('alice', 'a@test.local', 'password123');
   });
 
   it('shows api error', async () => {
-    apiFetchMock.mockRejectedValueOnce(new ApiError('validation_error', 'duplicate', 400));
+    registerMock.mockRejectedValueOnce(new ApiError('validation_error', 'duplicate', 400));
     renderPage();
     fillValidForm();
     fireEvent.click(screen.getByRole('button', { name: '登録' }));

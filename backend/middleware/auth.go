@@ -25,47 +25,95 @@ type AuthConfig struct {
 func Auth(cfg AuthConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			cookie, err := c.Cookie(AccessCookieName)
-			if err != nil || cookie.Value == "" {
-				return dto.WriteError(c, usecase.ErrUnauthorized)
-			}
-			token, err := cfg.JWT.Parse(cookie.Value)
+			info, err := resolveAuthFromCookie(c, cfg, true)
 			if err != nil {
 				return dto.WriteError(c, err)
 			}
-			if cfg.Revoker != nil {
-				revoked, err := authCheckRevoked(c.Request().Context(), cfg.Revoker, token.JTI)
-				if err != nil {
-					return dto.WriteError(c, err)
-				}
-				if revoked {
-					return dto.WriteError(c, usecase.ErrUnauthorized)
-				}
+			if info.UserID == uuid.Nil {
+				return dto.WriteError(c, usecase.ErrUnauthorized)
 			}
-			if cfg.ForceLogout != nil && !token.IssuedAt.IsZero() {
-				before, err := authForceLogoutBefore(c.Request().Context(), cfg.ForceLogout, token.UserID)
-				if err != nil {
-					return dto.WriteError(c, err)
-				}
-				if !before.IsZero() && token.IssuedAt.Before(before) {
-					return dto.WriteError(c, usecase.ErrUnauthorized)
-				}
-			}
-			if cfg.Repo.User != nil {
-				user, err := cfg.Repo.User.FindByID(c.Request().Context(), token.UserID)
-				if err != nil {
-					return dto.WriteError(c, err)
-				}
-				if user == nil || user.IsDeleted() {
-					return dto.WriteError(c, usecase.ErrUnauthorized)
-				}
-			}
-			SetAuth(c, AuthInfo{
-				UserID: token.UserID, Role: token.Role, JTI: token.JTI, ExpiresAt: token.ExpiresAt,
-			})
+			SetAuth(c, info)
 			return next(c)
 		}
 	}
+}
+
+//TryAuthはCookieが有効なときだけAuthInfoをセットし、未ログインでも401にしない
+func TryAuth(cfg AuthConfig) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			info, err := resolveAuthFromCookie(c, cfg, false)
+			if err == nil && info.UserID != uuid.Nil {
+				SetAuth(c, info)
+			}
+			return next(c)
+		}
+	}
+}
+
+func resolveAuthFromCookie(c echo.Context, cfg AuthConfig, strict bool) (AuthInfo, error) {
+	cookie, err := c.Cookie(AccessCookieName)
+	if err != nil || cookie.Value == "" {
+		if strict {
+			return AuthInfo{}, usecase.ErrUnauthorized
+		}
+		return AuthInfo{}, nil
+	}
+	token, err := cfg.JWT.Parse(cookie.Value)
+	if err != nil {
+		if strict {
+			return AuthInfo{}, err
+		}
+		return AuthInfo{}, nil
+	}
+	if cfg.Revoker != nil {
+		revoked, err := authCheckRevoked(c.Request().Context(), cfg.Revoker, token.JTI)
+		if err != nil {
+			if strict {
+				return AuthInfo{}, err
+			}
+			return AuthInfo{}, nil
+		}
+		if revoked {
+			if strict {
+				return AuthInfo{}, usecase.ErrUnauthorized
+			}
+			return AuthInfo{}, nil
+		}
+	}
+	if cfg.ForceLogout != nil && !token.IssuedAt.IsZero() {
+		before, err := authForceLogoutBefore(c.Request().Context(), cfg.ForceLogout, token.UserID)
+		if err != nil {
+			if strict {
+				return AuthInfo{}, err
+			}
+			return AuthInfo{}, nil
+		}
+		if !before.IsZero() && token.IssuedAt.Before(before) {
+			if strict {
+				return AuthInfo{}, usecase.ErrUnauthorized
+			}
+			return AuthInfo{}, nil
+		}
+	}
+	if cfg.Repo.User != nil {
+		user, err := cfg.Repo.User.FindByID(c.Request().Context(), token.UserID)
+		if err != nil {
+			if strict {
+				return AuthInfo{}, err
+			}
+			return AuthInfo{}, nil
+		}
+		if user == nil || user.IsDeleted() {
+			if strict {
+				return AuthInfo{}, usecase.ErrUnauthorized
+			}
+			return AuthInfo{}, nil
+		}
+	}
+	return AuthInfo{
+		UserID: token.UserID, Role: token.Role, JTI: token.JTI, ExpiresAt: token.ExpiresAt,
+	}, nil
 }
 
 func authCheckRevoked(ctx context.Context, revoker usecase.IJWTRevoker, jti string) (bool, error) {

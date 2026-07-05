@@ -22,7 +22,7 @@ type stubAuthUC struct {
 	getMeErr  error
 }
 
-func (s *stubAuthUC) Register(context.Context, usecase.RegisterInput) (*usecase.RegisterResult, error) {
+func (s *stubAuthUC) Register(context.Context, usecase.RegisterInput) (*usecase.LoginResult, error) {
 	return nil, nil
 }
 func (s *stubAuthUC) Login(context.Context, usecase.LoginInput) (*usecase.LoginResult, error) {

@@ -15,7 +15,7 @@ type RegisterInput struct {
 	Password string
 }
 
-func (a *AuthUseCase) Register(ctx context.Context, in RegisterInput) (*RegisterResult, error) {
+func (a *AuthUseCase) Register(ctx context.Context, in RegisterInput) (*LoginResult, error) {
 	if err := ValidateUsername(in.Username); err != nil {
 		return nil, mapValidationErr(err)
 	}
@@ -47,15 +47,25 @@ func (a *AuthUseCase) Register(ctx context.Context, in RegisterInput) (*Register
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
+	var tokens *SessionTokens
 	if err := repository.WithTx(ctx, a.DB, func(ctx context.Context) error {
-		return a.Users.Create(ctx, user)
+		if err := a.Users.Create(ctx, user); err != nil {
+			return err
+		}
+		if err := a.createLoginLog(ctx, user.ID, model.LoginActionLogin, now); err != nil {
+			return err
+		}
+		var err error
+		tokens, err = a.issueSession(ctx, user)
+		return err
 	}); err != nil {
 		return nil, err
 	}
-	return &RegisterResult{
-		ID:       user.ID.String(),
-		Username: user.Username,
-		Role:     string(user.Role),
-		WinCount: user.WinCount,
+	return &LoginResult{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		ID:           user.ID.String(),
+		Username:     user.Username,
+		Role:         string(user.Role),
 	}, nil
 }

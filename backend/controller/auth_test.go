@@ -1,6 +1,8 @@
 package controller_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -15,6 +17,10 @@ func TestAuthRegisterLoginRefreshLogout(t *testing.T) {
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register status %d: %s", rec.Code, rec.Body.String())
+	}
+	registerCookies := rec.Result().Cookies()
+	if len(registerCookies) == 0 {
+		t.Fatal("expected cookies after register")
 	}
 
 	rec = env.do(t, http.MethodPost, "/api/auth/login", nil, map[string]string{
@@ -37,6 +43,61 @@ func TestAuthRegisterLoginRefreshLogout(t *testing.T) {
 	rec = env.do(t, http.MethodPost, "/api/auth/logout", newCookies, nil)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("logout status %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAuthRegisterSetsCookies(t *testing.T) {
+	env := setupCtrlEnv(t)
+	rec := env.do(t, http.MethodPost, "/api/auth/register", nil, map[string]string{
+		"username": "alice", "email": "alice@test.local", "password": "password123",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register status %d", rec.Code)
+	}
+	var foundAccess, foundRefresh bool
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == middleware.AccessCookieName {
+			foundAccess = true
+		}
+		if c.Name == middleware.RefreshCookieName {
+			foundRefresh = true
+		}
+	}
+	if !foundAccess || !foundRefresh {
+		t.Fatalf("cookies missing after register: access=%v refresh=%v", foundAccess, foundRefresh)
+	}
+}
+
+func TestAuthSessionWithoutCookie(t *testing.T) {
+	env := setupCtrlEnv(t)
+	rec := env.do(t, http.MethodGet, "/api/auth/session", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("session status %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Data any `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Data != nil {
+		t.Fatalf("expected null session, got %v", body.Data)
+	}
+}
+
+func TestAuthSessionWithCookie(t *testing.T) {
+	env := setupCtrlEnv(t)
+	testutil.CreateUser(t, env.repos, "alice", "alice@test.local", "password123")
+	loginRec := env.do(t, http.MethodPost, "/api/auth/login", nil, map[string]string{
+		"email": "alice@test.local", "password": "password123",
+	})
+	cookies := loginRec.Result().Cookies()
+	rec := env.do(t, http.MethodGet, "/api/auth/session", cookies, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("session status %d: %s", rec.Code, rec.Body.String())
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"username":"alice"`)) {
+		t.Fatalf("session body: %s", rec.Body.String())
 	}
 }
 

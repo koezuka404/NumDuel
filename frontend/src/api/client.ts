@@ -1,4 +1,4 @@
-import type { ApiDataResponse, ApiErrorBody } from '../types/dto';
+import type { ApiDataResponse, ApiErrorBody, AuthUser } from '../types/dto';
 import { resolveApiBaseURL } from '../lib/apiBase';
 import { apiErrorMessage } from '../lib/labels';
 
@@ -40,6 +40,21 @@ async function parseError(res: Response): Promise<ApiError> {
   const rawMessage = body.error?.message ?? '';
   const message = apiErrorMessage(code, rawMessage);
   return new ApiError(code, message, res.status);
+}
+
+export async function fetchSession(): Promise<AuthUser | null> {
+  const res = await fetch(`${API_BASE_URL}/auth/session`, {
+    ...defaultFetchOptions,
+    method: 'GET',
+  });
+  if (res.status === 401 || res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    return null;
+  }
+  const json = (await res.json()) as ApiDataResponse<AuthUser | null>;
+  return json.data ?? null;
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
