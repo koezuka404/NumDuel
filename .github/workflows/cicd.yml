@@ -261,7 +261,6 @@ jobs:
           ORIGIN="${API_BASE_URL%/api}"
           echo "DEBUG: API_BASE_URL length=${#API_BASE_URL}"
           echo "DEBUG: ORIGIN=$ORIGIN"
-          curl -v "$ORIGIN/health" || true
           curl -fsS "$ORIGIN/health" >/dev/null
 
           USER="smoke_${GITHUB_RUN_ID:-0}_${RANDOM}_$(date +%s)"
@@ -275,10 +274,10 @@ jobs:
               -d "{\"username\":\"$USER\",\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" \
               "$API_BASE_URL/auth/register") || true
             REGISTER=$(cat /tmp/smoke_register.json)
+            echo "DEBUG: register attempt $attempt http_status=$HTTP body=$REGISTER"
             if [ "$HTTP" = "201" ]; then
               break
             fi
-            echo "register attempt $attempt: http_status=$HTTP body=$REGISTER"
             if [ "$attempt" -eq 5 ]; then
               echo "--- GET $ORIGIN/health (diagnostic) ---"
               curl -sS "$ORIGIN/health" || true
@@ -289,15 +288,20 @@ jobs:
             sleep 6
           done
 
-          LOGIN=$(curl -sS -c cookies.txt -b cookies.txt -H "Content-Type: application/json" \
-            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" "$API_BASE_URL/auth/login")
-          LOGIN_OK=$(echo "$LOGIN" | jq -r '.data.username // empty')
+          echo "DEBUG: attempting login for $EMAIL"
+          LOGIN=$(curl -sS -w "\nHTTP_STATUS:%{http_code}" -c cookies.txt -b cookies.txt -H "Content-Type: application/json" \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" "$API_BASE_URL/auth/login") || true
+          echo "DEBUG: LOGIN raw response=$LOGIN"
+          LOGIN_BODY=$(echo "$LOGIN" | sed '$d')
+          LOGIN_OK=$(echo "$LOGIN_BODY" | jq -r '.data.username // empty' 2>/dev/null || echo "")
+          echo "DEBUG: LOGIN_OK=$LOGIN_OK"
           if [ -z "$LOGIN_OK" ]; then
             echo "login failed: $LOGIN"
             exit 1
           fi
 
           ME_STATUS=$(curl -sS -o /tmp/smoke_me.json -w "%{http_code}" -c cookies.txt -b cookies.txt "$API_BASE_URL/me")
+          echo "DEBUG: ME_STATUS=$ME_STATUS body=$(cat /tmp/smoke_me.json)"
           if [ "$ME_STATUS" -lt 200 ] || [ "$ME_STATUS" -ge 300 ]; then
             echo "/api/me failed (status=$ME_STATUS)"
             cat /tmp/smoke_me.json
@@ -305,6 +309,7 @@ jobs:
           fi
 
           WS_URL="${ORIGIN/http/ws}/ws"
+          echo "DEBUG: WS_URL=$WS_URL"
           WS_URL="$WS_URL" COOKIE_FILE="cookies.txt" node <<'NODE'
           const fs = require('fs');
           const WebSocket = require('ws');
@@ -317,11 +322,13 @@ jobs:
             return `${cols[5]}=${cols[6]}`;
           }).join('; ');
           const ws = new WebSocket(wsUrl, { headers: { Cookie: cookie } });
-          const timer = setTimeout(() => { process.exit(1); }, 10000);
+          const timer = setTimeout(() => { console.log('DEBUG: ws timeout'); process.exit(1); }, 10000);
           ws.on('open', () => {
+            console.log('DEBUG: ws open, sending AUTH');
             ws.send(JSON.stringify({ type: 'AUTH' }));
           });
           ws.on('message', (msg) => {
+            console.log('DEBUG: ws message', String(msg));
             try {
               const data = JSON.parse(String(msg));
               if (data.type === 'AUTH_OK') {
@@ -331,7 +338,7 @@ jobs:
               }
             } catch (_) {}
           });
-          ws.on('error', () => process.exit(1));
+          ws.on('error', (e) => { console.log('DEBUG: ws error', e.message); process.exit(1); });
           NODE
 
   k6-load:
