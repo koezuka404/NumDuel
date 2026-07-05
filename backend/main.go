@@ -61,11 +61,20 @@ func main() {
 	}
 	if rdb != nil {
 		defer rdb.Close()
+	} else if !cfg.Production {
+		log.Printf("warning: redis not configured; running without revoke/locks/ws session store")
 	}
 	redisStore := infrredis.NewStore(rdb)
+	jwtRevoker := infrredis.JWTRevoker(redisStore)
+	forceLogout := infrredis.ForceLogoutStore(redisStore)
+	wsRedis := infrredis.WSSessionStore(redisStore)
+	gameLocks := infrredis.GameLockStore(redisStore)
+	turnStore := infrredis.TurnStore(redisStore)
+	distLocks := infrredis.DistributedLockStore(redisStore)
+	backupStatus := infrredis.BackupStatusStore(redisStore)
 
 	hub := infrws.NewHub()
-	sessionStore := infrws.NewSessionStore(hub, redisStore)
+	sessionStore := infrws.NewSessionStore(hub, wsRedis)
 	refreshGen := infrcrypto.NewRefreshTokenService()
 
 	authUC := usecase.NewAuthUseCase(
@@ -73,25 +82,25 @@ func main() {
 		infrcrypto.NewPasswordService(),
 		jwtService,
 		refreshGen,
-		redisStore,
+		jwtRevoker,
 		sessionStore,
 		cfg.RefreshTokenExpiryDays,
 		cfg.RefreshTokenCleanupGraceDays,
 	)
 	gameUC := usecase.NewGameUseCase(
-		dbSetup.Repos, secretHasher, redisStore, redisStore,
+		dbSetup.Repos, secretHasher, gameLocks, turnStore,
 		infrcrypto.NewRandomNumberService(), hub,
 		cfg.TurnDuration(), cfg.SecretSetupDuration(), cfg.GameLockTTL(),
 	)
 	matchingUC := usecase.NewMatchingUseCase(dbSetup.Repos, hub)
 	profileUC := usecase.NewProfileUseCase(dbSetup.Repos)
-	rankingUC := usecase.NewRankingUseCase(dbSetup.Repos, redisStore, cfg.AdminLockTTL())
-	adminUC := usecase.NewAdminUseCase(dbSetup.Repos, rankingUC, sessionStore, redisStore, redisStore, redisStore, cfg.AdminLockTTL())
-	wsAuthUC := usecase.NewWSAuthUseCase(dbSetup.Repos, jwtService, redisStore, redisStore, hub)
-	autoLogoutUC := usecase.NewAutoLogoutUseCase(dbSetup.Repos, redisStore, func(ctx context.Context, userID uuid.UUID) error {
+	rankingUC := usecase.NewRankingUseCase(dbSetup.Repos, distLocks, cfg.AdminLockTTL())
+	adminUC := usecase.NewAdminUseCase(dbSetup.Repos, rankingUC, sessionStore, forceLogout, backupStatus, distLocks, cfg.AdminLockTTL())
+	wsAuthUC := usecase.NewWSAuthUseCase(dbSetup.Repos, jwtService, jwtRevoker, forceLogout, hub)
+	autoLogoutUC := usecase.NewAutoLogoutUseCase(dbSetup.Repos, forceLogout, func(ctx context.Context, userID uuid.UUID) error {
 		return sessionStore.DisconnectWithError(ctx, userID, "unauthorized", "認証に失敗しました")
 	}, cfg.SessionTimeout())
-	backupUC := usecase.NewBackupUseCase(dbSetup.Syncer, redisStore, 0)
+	backupUC := usecase.NewBackupUseCase(dbSetup.Syncer, backupStatus, 0)
 	logRetentionUC := usecase.NewLogRetentionUseCase(
 		dbSetup.Repos,
 		cfg.ActivityLogRetentionDays,
@@ -107,7 +116,7 @@ func main() {
 	}
 	wsHandler := &infrws.Handler{
 		Hub: hub, WSAuth: wsAuthUC, Game: gameUC,
-		Allowed: allowed, Redis: redisStore,
+		Allowed: allowed, Redis: wsRedis,
 		JWTMin: cfg.JWTExpiryMinutes,
 	}
 
@@ -148,8 +157,8 @@ func main() {
 		Ranking: rankingUC, Admin: adminUC,
 		WSAuth: wsAuthUC, WS: wsHandler, JWT: jwtService,
 		AuthMW: middleware.AuthConfig{
-			JWT: jwtService, Revoker: redisStore,
-			ForceLogout: redisStore, Repo: dbSetup.Repos,
+			JWT: jwtService, Revoker: jwtRevoker,
+			ForceLogout: forceLogout, Repo: dbSetup.Repos,
 		},
 		Activity: middleware.ActivityUpdateConfig{Repo: dbSetup.Repos},
 		Cfg: cfg,

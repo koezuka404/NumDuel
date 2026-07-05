@@ -12,6 +12,7 @@ import (
 
 	infrcrypto "github.com/numduel/numduel/crypto"
 	"github.com/numduel/numduel/middleware"
+	infrredis "github.com/numduel/numduel/redis"
 	"github.com/numduel/numduel/testutil"
 )
 
@@ -199,6 +200,37 @@ func TestAuthAllowsRequestWhenRedisUnavailable(t *testing.T) {
 	e.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("degraded auth status %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAuthWithNilRedisOptionalHelpers(t *testing.T) {
+	_, repos := testutil.OpenSQLiteDB(t)
+	jwtSvc, err := infrcrypto.NewJWTService(testutil.TestJWTSecret, 60)
+	if err != nil {
+		t.Fatalf("jwt: %v", err)
+	}
+	user := testutil.CreateUser(t, repos, "alice", "alice@test.local", "password123")
+	token, err := jwtSvc.Issue(user.ID, user.Role, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("issue: %v", err)
+	}
+
+	var store *infrredis.Store
+	e := echo.New()
+	e.GET("/protected", func(c echo.Context) error { return c.NoContent(http.StatusOK) },
+		middleware.Auth(middleware.AuthConfig{
+			JWT: jwtSvc,
+			Revoker: infrredis.JWTRevoker(store),
+			ForceLogout: infrredis.ForceLogoutStore(store),
+			Repo: repos,
+		}))
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.AddCookie(&http.Cookie{Name: middleware.AccessCookieName, Value: token})
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("nil redis optional auth status %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 
