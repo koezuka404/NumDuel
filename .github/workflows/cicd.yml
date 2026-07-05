@@ -242,7 +242,19 @@ jobs:
         run: go run ./migrations/migrate.go
 
   smoke-test:
-    - name: API smoke (/health, register, login, /me, ws auth)
+    smoke-test:
+    name: Smoke Test (API)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    needs: [container-build, security-scan, publish-images, production-migrate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install ws client dependency
+        run: npm install ws@8
+      - name: API smoke (/health, register, login, /me, ws auth)
         env:
           API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
         run: |
