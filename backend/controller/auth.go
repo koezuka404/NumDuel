@@ -95,24 +95,44 @@ func (h *AuthController) Logout(c echo.Context) error {
 
 func (h *AuthController) setAuthCookies(c echo.Context, accessToken, refreshToken string) {
 	c.SetCookie(&http.Cookie{
-		Name: middleware.AccessCookieName, Value: accessToken, Path: "/",
-		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode,
-		MaxAge: h.JWTExpiryMinutes * 60,
+		Name:     middleware.AccessCookieName,
+		Value:    accessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
+		MaxAge:   h.JWTExpiryMinutes * 60,
 	})
+
 	c.SetCookie(&http.Cookie{
-		Name: middleware.RefreshCookieName, Value: refreshToken, Path: "/api/auth/refresh",
-		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode,
-		MaxAge: h.RefreshTokenExpiryDays * 86400,
+		Name:     middleware.RefreshCookieName,
+		Value:    refreshToken,
+		Path:     "/api/auth/refresh",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
+		MaxAge:   h.RefreshTokenExpiryDays * 86400,
 	})
 }
 
 func (h *AuthController) clearAuthCookies(c echo.Context) {
 	c.SetCookie(&http.Cookie{
-		Name: middleware.AccessCookieName, Value: "", Path: "/",
-		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode, MaxAge: 0,
+		Name:     middleware.AccessCookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
+		MaxAge:   -1,
 	})
+
 	c.SetCookie(&http.Cookie{
-		Name: middleware.RefreshCookieName, Value: "", Path: "/api/auth/refresh",
-		HttpOnly: true, Secure: h.CookieSecure, SameSite: http.SameSiteStrictMode, MaxAge: 0,
+		Name:     middleware.RefreshCookieName,
+		Value:    "",
+		Path:     "/api/auth/refresh",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
+		MaxAge:   -1,
 	})
 }
