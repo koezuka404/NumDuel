@@ -242,23 +242,15 @@ jobs:
         run: go run ./migrations/migrate.go
 
   smoke-test:
-    name: Smoke Test (API)
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
-    needs: [container-build, security-scan, publish-images, production-migrate]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-      - name: Install ws client dependency
-        run: npm install ws@8
-      - name: API smoke (/health, register, login, /me, ws auth)
+    - name: API smoke (/health, register, login, /me, ws auth)
         env:
           API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
         run: |
           set -euo pipefail
           ORIGIN="${API_BASE_URL%/api}"
+          echo "DEBUG: API_BASE_URL length=${#API_BASE_URL}"
+          echo "DEBUG: ORIGIN=$ORIGIN"
+          curl -v "$ORIGIN/health" || true
           curl -fsS "$ORIGIN/health" >/dev/null
 
           USER="smoke_${GITHUB_RUN_ID:-0}_${RANDOM}_$(date +%s)"
@@ -392,3 +384,4 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
