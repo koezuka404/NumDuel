@@ -12,7 +12,7 @@ func newAuthCookie(name, value, path string, maxAge int) *http.Cookie {
 		Path:     path,
 		HttpOnly: true,
 		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode, // クロスドメイン構成のため Lax → None に変更
 		MaxAge:   maxAge,
 	}
 }
