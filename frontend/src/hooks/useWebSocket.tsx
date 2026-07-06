@@ -29,6 +29,19 @@ const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 const API_BASE_URL = resolveApiBaseURL();
 const WS_BASE_URL = resolveWsBaseURL();
 
+async function fetchWsTicket(): Promise<string> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/ws-ticket`, { credentials: 'include' });
+    if (!res.ok) {
+      return '';
+    }
+    const json = await res.json();
+    return json?.data?.ticket ?? json?.ticket ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, user } = useAuth();
   const [connected, setConnected] = useState(false);
@@ -81,17 +94,25 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     [disconnect],
   );
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (!shouldConnectRef.current || wsRef.current) {
       return;
     }
     setConnecting(true);
+
+    const ticket = await fetchWsTicket();
+
+    if (!shouldConnectRef.current) {
+      setConnecting(false);
+      return;
+    }
+
     const ws = new WebSocket(WS_BASE_URL);
     wsRef.current = ws;
 
     ws.onopen = () => {
       reconnectAttemptRef.current = 0;
-      ws.send(JSON.stringify({ type: 'AUTH' }));
+      ws.send(JSON.stringify({ type: 'AUTH', ticket }));
       clearPing();
       pingRef.current = window.setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -143,14 +164,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const reconnect = useCallback(() => {
     wsRef.current?.close();
     wsRef.current = null;
-    connect();
+    void connect();
   }, [connect]);
 
   useEffect(() => {
     const enabled = isAuthenticated && user?.role === 'user';
     if (enabled) {
       shouldConnectRef.current = true;
-      connect();
+      void connect();
     } else {
       disconnect();
     }

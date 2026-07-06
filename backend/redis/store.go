@@ -1,4 +1,4 @@
-//Redis補助ストア
+// Redis補助ストア
 package redis
 
 import (
@@ -22,6 +22,7 @@ end
 return 0
 `
 	forceLogoutTTL = 30 * 24 * time.Hour
+	wsTicketPrefix = "ws:ticket:"
 )
 
 var marshalJSON = json.Marshal
@@ -38,6 +39,7 @@ var (
 	_ usecase.IForceLogoutStore     = (*Store)(nil)
 	_ usecase.IBackupStatusStore    = (*Store)(nil)
 	_ usecase.IDistributedLockStore = (*Store)(nil)
+	_ usecase.IWSTicketStore        = (*Store)(nil)
 )
 
 func NewStore(rdb *goredis.Client) *Store {
@@ -153,13 +155,13 @@ func (s *Store) GetTurn(ctx context.Context, gameID uuid.UUID) (*usecase.TurnInf
 	}, nil
 }
 
-//ExpiredTurnEntryは期限切れターン1件
+// ExpiredTurnEntryは期限切れターン1件
 type ExpiredTurnEntry struct {
 	GameID   uuid.UUID
 	PlayerID uuid.UUID
 }
 
-//ListExpiredTurnsはgame:*:turnのうちexpiresAt<=nowのものを返す
+// ListExpiredTurnsはgame:*:turnのうちexpiresAt<=nowのものを返す
 func (s *Store) ListExpiredTurns(ctx context.Context, now time.Time) ([]ExpiredTurnEntry, error) {
 	now = now.UTC()
 	var (
@@ -219,7 +221,7 @@ func (s *Store) GetForceLogoutBefore(ctx context.Context, userID uuid.UUID) (tim
 	return time.Unix(sec, 0).UTC(), nil
 }
 
-//SetForceLogoutBeforeはAutoLogoutWorker/管理操作向けTTL30日固定
+// SetForceLogoutBeforeはAutoLogoutWorker/管理操作向けTTL30日固定
 func (s *Store) SetForceLogoutBefore(ctx context.Context, userID uuid.UUID, t time.Time) error {
 	return s.rdb.Set(ctx, forceLogoutKey(userID), strconv.FormatInt(t.UTC().Unix(), 10), forceLogoutTTL).Err()
 }
@@ -254,7 +256,7 @@ func (s *Store) GetBackupStatus(ctx context.Context) (*usecase.BackupStatus, err
 	return out, nil
 }
 
-//SetBackupStatusはBackupWorker成功/失敗時に更新する
+// SetBackupStatusはBackupWorker成功/失敗時に更新する
 func (s *Store) SetBackupStatus(ctx context.Context, status string, lastSyncedAt time.Time) error {
 	payload := map[string]string{"status": status}
 	if !lastSyncedAt.IsZero() {
@@ -265,6 +267,32 @@ func (s *Store) SetBackupStatus(ctx context.Context, status string, lastSyncedAt
 		return err
 	}
 	return s.rdb.Set(ctx, backupStatusKey(), raw, 0).Err()
+}
+
+// IssueTicketはWS接続用の使い捨てticketを発行し、userIDをttl秒だけ紐付けて保存する。
+func (s *Store) IssueTicket(ctx context.Context, userID uuid.UUID, ttl time.Duration) (string, error) {
+	if ttl <= 0 {
+		ttl = 10 * time.Second
+	}
+	ticket := uuid.NewString()
+	if err := s.rdb.Set(ctx, wsTicketPrefix+ticket, userID.String(), ttl).Err(); err != nil {
+		return "", err
+	}
+	return ticket, nil
+}
+
+// ConsumeTicketはticketに紐付いたuserIDを取得し、ワンタイムなので直後に削除する。
+func (s *Store) ConsumeTicket(ctx context.Context, ticket string) (uuid.UUID, error) {
+	key := wsTicketPrefix + ticket
+	val, err := s.rdb.Get(ctx, key).Result()
+	if err == goredis.Nil {
+		return uuid.Nil, fmt.Errorf("invalid or expired ticket")
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	_ = s.rdb.Del(ctx, key)
+	return uuid.Parse(val)
 }
 
 func jwtRevokedKey(jti string) string {

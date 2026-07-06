@@ -46,7 +46,7 @@ func TestRegisterWithWebSocket(t *testing.T) {
 	authUC := testutil.NewAuthUC(t, repos)
 	hub := infrws.NewHub()
 	gameUC := testutil.NewGameUCWithNotifier(t, repos, hub)
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, hub)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, hub, nil)
 	wsHandler := &infrws.Handler{
 		Hub: hub, WSAuth: wsAuth, Game: gameUC, JWTMin: 60,
 	}

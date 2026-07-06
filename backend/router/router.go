@@ -6,9 +6,9 @@ import (
 	"github.com/numduel/numduel/config"
 	"github.com/numduel/numduel/controller"
 	infrcrypto "github.com/numduel/numduel/crypto"
-	infrws "github.com/numduel/numduel/websocket"
 	"github.com/numduel/numduel/middleware"
 	"github.com/numduel/numduel/usecase"
+	infrws "github.com/numduel/numduel/websocket"
 )
 
 type Deps struct {
@@ -33,6 +33,7 @@ func Register(e *echo.Echo, deps Deps) {
 	game := controller.NewGameController(deps.Game)
 	ranking := controller.NewRankingController(deps.Ranking)
 	admin := controller.NewAdminController(deps.Admin)
+	wsAuthCtrl := controller.NewWSAuthController(deps.WSAuth)
 
 	api := e.Group("/api", middleware.RateLimitPublic())
 	api.POST("/auth/register", auth.Register)
@@ -46,6 +47,7 @@ func Register(e *echo.Echo, deps Deps) {
 		middleware.ActivityUpdate(deps.Activity),
 	)
 	protected.POST("/auth/logout", auth.Logout)
+	protected.GET("/auth/ws-ticket", wsAuthCtrl.IssueTicket)
 	protected.GET("/me", me.Get)
 	protected.GET("/me/profile", me.GetProfile)
 	protected.GET("/me/match-history", me.MatchHistory)

@@ -1,4 +1,4 @@
-//アプリケーションのエントリポイント
+// アプリケーションのエントリポイント
 package main
 
 import (
@@ -16,8 +16,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/numduel/numduel/config"
-	"github.com/numduel/numduel/db"
 	infrcrypto "github.com/numduel/numduel/crypto"
+	"github.com/numduel/numduel/db"
 	"github.com/numduel/numduel/middleware"
 	infrredis "github.com/numduel/numduel/redis"
 	"github.com/numduel/numduel/repository"
@@ -72,6 +72,7 @@ func main() {
 	turnStore := infrredis.TurnStore(redisStore)
 	distLocks := infrredis.DistributedLockStore(redisStore)
 	backupStatus := infrredis.BackupStatusStore(redisStore)
+	wsTickets := infrredis.WSTicketStore(redisStore)
 
 	hub := infrws.NewHub()
 	sessionStore := infrws.NewSessionStore(hub, wsRedis)
@@ -96,7 +97,7 @@ func main() {
 	profileUC := usecase.NewProfileUseCase(dbSetup.Repos)
 	rankingUC := usecase.NewRankingUseCase(dbSetup.Repos, distLocks, cfg.AdminLockTTL())
 	adminUC := usecase.NewAdminUseCase(dbSetup.Repos, rankingUC, sessionStore, forceLogout, backupStatus, distLocks, cfg.AdminLockTTL())
-	wsAuthUC := usecase.NewWSAuthUseCase(dbSetup.Repos, jwtService, jwtRevoker, forceLogout, hub)
+	wsAuthUC := usecase.NewWSAuthUseCase(dbSetup.Repos, jwtService, jwtRevoker, forceLogout, hub, wsTickets)
 	autoLogoutUC := usecase.NewAutoLogoutUseCase(dbSetup.Repos, forceLogout, func(ctx context.Context, userID uuid.UUID) error {
 		return sessionStore.DisconnectWithError(ctx, userID, "unauthorized", "認証に失敗しました")
 	}, cfg.SessionTimeout())
@@ -161,7 +162,7 @@ func main() {
 			ForceLogout: forceLogout, Repo: dbSetup.Repos,
 		},
 		Activity: middleware.ActivityUpdateConfig{Repo: dbSetup.Repos},
-		Cfg: cfg,
+		Cfg:      cfg,
 	})
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())

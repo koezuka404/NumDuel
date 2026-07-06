@@ -19,7 +19,7 @@ func TestWSAuthRecordConnectionAndClose(t *testing.T) {
 		t.Fatalf("jwt: %v", err)
 	}
 	user := testutil.CreateUser(t, repos, "alice", "alice@test.local", "password123")
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil, nil)
 	wsAuth.Now = func() time.Time { return time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC) }
 
 	logID, err := wsAuth.RecordConnection(context.Background(), user.ID, "conn-abc")
@@ -45,7 +45,7 @@ func TestWSAuthTouchActivity(t *testing.T) {
 	_, repos := testutil.OpenSQLiteDB(t)
 	jwtSvc, _ := infrcrypto.NewJWTService(testutil.TestJWTSecret, 60)
 	user := testutil.CreateUser(t, repos, "alice", "alice@test.local", "password123")
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil, nil)
 	touchTime := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
 	wsAuth.Now = func() time.Time { return touchTime }
 
@@ -65,7 +65,7 @@ func TestWSAuthNotifyOpponentStatus(t *testing.T) {
 	match := usecase.NewMatchingUseCase(repos, notifier)
 	gameUC := testutil.NewGameUC(t, repos)
 	jwtSvc, _ := infrcrypto.NewJWTService(testutil.TestJWTSecret, 60)
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, notifier)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, notifier, nil)
 
 	a := testutil.CreateUser(t, repos, "alice", "alice@test.local", "password123")
 	b := testutil.CreateUser(t, repos, "bob", "bob@test.local", "password123")
@@ -97,7 +97,7 @@ func TestWSAuthNotifyNoActiveGame(t *testing.T) {
 	_, repos := testutil.OpenSQLiteDB(t)
 	notifier := &captureNotifier{}
 	jwtSvc, _ := infrcrypto.NewJWTService(testutil.TestJWTSecret, 60)
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, notifier)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, notifier, nil)
 	user := testutil.CreateUser(t, repos, "alice", "alice@test.local", "password123")
 
 	wsAuth.NotifyOpponentConnected(context.Background(), user.ID)

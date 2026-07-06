@@ -32,7 +32,7 @@ func TestWSAuthRejectsRevokedToken(t *testing.T) {
 		t.Fatalf("revoke: %v", err)
 	}
 
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, revoker, nil, nil)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, revoker, nil, nil, nil)
 	_, err = wsAuth.Authenticate(context.Background(), token)
 	if !errors.Is(err, usecase.ErrUnauthorized) {
 		t.Fatalf("revoked token: %v", err)
@@ -56,7 +56,7 @@ func TestWSAuthRejectsForceLogoutToken(t *testing.T) {
 		t.Fatalf("force logout: %v", err)
 	}
 
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, force, nil)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, force, nil, nil)
 	_, err = wsAuth.Authenticate(context.Background(), token)
 	if !errors.Is(err, usecase.ErrUnauthorized) {
 		t.Fatalf("force logout token: %v", err)
@@ -69,7 +69,7 @@ func TestWSAuthRejectsEmptyToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("jwt: %v", err)
 	}
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil, nil)
 	_, err = wsAuth.Authenticate(context.Background(), "")
 	if !errors.Is(err, usecase.ErrUnauthorized) {
 		t.Fatalf("empty token: %v", err)
@@ -93,7 +93,7 @@ func TestWSAuthRejectsDeletedUser(t *testing.T) {
 		t.Fatalf("delete user: %v", err)
 	}
 
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, nil, nil)
 	_, err = wsAuth.Authenticate(context.Background(), token)
 	if !errors.Is(err, usecase.ErrUnauthorized) {
 		t.Fatalf("deleted user token: %v", err)

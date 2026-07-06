@@ -53,3 +53,10 @@ func BackupStatusStore(s *Store) usecase.IBackupStatusStore {
 	}
 	return s
 }
+
+func WSTicketStore(s *Store) usecase.IWSTicketStore {
+	if s == nil {
+		return nil
+	}
+	return s
+}

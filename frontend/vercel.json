@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://numduel-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/ws",
+      "destination": "https://numduel-backend.onrender.com/ws"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

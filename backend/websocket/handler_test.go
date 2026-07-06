@@ -42,6 +42,14 @@ func (s *wsAuthStub) Authenticate(ctx context.Context, token string) (*usecase.W
 	return s.inner.Authenticate(ctx, token)
 }
 
+func (s *wsAuthStub) AuthenticateByTicket(ctx context.Context, ticket string) (*usecase.WSAuthOutput, error) {
+	return s.inner.AuthenticateByTicket(ctx, ticket)
+}
+
+func (s *wsAuthStub) IssueTicket(ctx context.Context, userID uuid.UUID) (string, error) {
+	return s.inner.IssueTicket(ctx, userID)
+}
+
 func (s *wsAuthStub) NotifyOpponentConnected(ctx context.Context, userID uuid.UUID) {
 	s.inner.NotifyOpponentConnected(ctx, userID)
 }
@@ -89,7 +97,7 @@ func setupWSTestWithOpts(t *testing.T, opts wsTestOpts) *testEnv {
 	hub := infrws.NewHub()
 	gameUC := testutil.NewGameUCWithNotifier(t, repos, hub)
 	matchingUC := testutil.NewMatchingUC(repos)
-	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, hub)
+	wsAuth := usecase.NewWSAuthUseCase(repos, jwtSvc, nil, nil, hub, nil)
 	var wsAuthUC usecase.IWSAuthUsecase = wsAuth
 	if opts.recordConnErr != nil {
 		wsAuthUC = &wsAuthStub{inner: wsAuth, recordConnErr: opts.recordConnErr}

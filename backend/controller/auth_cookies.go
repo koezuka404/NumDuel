@@ -4,16 +4,15 @@ import (
 	"net/http"
 )
 
-// newAuthCookie builds a cross-site auth cookie (Vercel frontend ↔ Render backend).
+// newAuthCookie builds a same-site auth cookie (Vercel rewrites proxy → same origin).
 func newAuthCookie(name, value, path string, maxAge int) *http.Cookie {
-	// #nosec G124 -- SameSite=None with Secure is required for cross-origin cookie auth
 	return &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     path,
 		HttpOnly: true,
 		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
 	}
 }

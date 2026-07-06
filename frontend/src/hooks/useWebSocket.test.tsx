@@ -13,10 +13,21 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <WebSocketProvider>{children}</WebSocketProvider>;
 }
 
+function mockWsTicketFetch() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { ticket: 'test-ticket' } }),
+    }),
+  );
+}
+
 describe('useWebSocket', () => {
   beforeEach(() => {
     MockWebSocket.reset();
     vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+    mockWsTicketFetch();
     useAuth.mockReturnValue({
       isAuthenticated: true,
       user: { id: '1', username: 'alice', role: 'user' },
@@ -69,20 +80,24 @@ describe('useWebSocket', () => {
     await waitFor(() => expect(result.current.connected).toBe(false));
   });
 
-  it('emits RECONNECT_FAILED after max reconnect attempts', () => {
+  it('emits RECONNECT_FAILED after max reconnect attempts', async () => {
     vi.useFakeTimers();
     const listener = vi.fn();
     const { result } = renderHook(() => useWebSocket(), { wrapper });
     result.current.subscribe(listener);
 
+    await waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+
     for (let attempt = 0; attempt < 6; attempt += 1) {
+      const ws = MockWebSocket.latest();
       act(() => {
-        MockWebSocket.latest().close();
+        ws.close();
       });
       if (attempt < 5) {
         act(() => {
           vi.advanceTimersByTime(1000 * 2 ** attempt);
         });
+        await waitFor(() => expect(MockWebSocket.instances.length).toBeGreaterThan(attempt));
       }
     }
 

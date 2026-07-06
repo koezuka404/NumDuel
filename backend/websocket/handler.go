@@ -26,6 +26,7 @@ type Handler struct {
 
 type clientMsg struct {
 	Type         string `json:"type"`
+	Ticket       string `json:"ticket"`
 	GameID       string `json:"gameId"`
 	SecretNumber string `json:"secretNumber"`
 	GuessNumber  string `json:"guessNumber"`
@@ -84,13 +85,23 @@ func (h *Handler) Handle(c echo.Context) error {
 				h.writeError(conn, "unauthorized", "認証が必要です")
 				continue
 			}
-			token := ""
-			if ck, err := c.Request().Cookie(middleware.AccessCookieName); err == nil {
-				token = ck.Value
+
+			var out *usecase.WSAuthOutput
+			var authErr error
+
+			if msg.Ticket != "" {
+				// 同一オリジン経由のCookie送信に依存しない、ワンタイムticket認証
+				out, authErr = h.WSAuth.AuthenticateByTicket(ctx, msg.Ticket)
+			} else {
+				token := ""
+				if ck, err := c.Request().Cookie(middleware.AccessCookieName); err == nil {
+					token = ck.Value
+				}
+				out, authErr = h.WSAuth.Authenticate(ctx, token)
 			}
-			out, err := h.WSAuth.Authenticate(ctx, token)
-			if err != nil {
-				h.writeUseCaseError(conn, err)
+
+			if authErr != nil {
+				h.writeUseCaseError(conn, authErr)
 				continue
 			}
 			userID = out.UserID
