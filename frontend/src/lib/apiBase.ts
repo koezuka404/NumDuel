@@ -17,9 +17,10 @@ export function resolveWsBaseURL(): string {
     return base.endsWith('/ws') ? base : `${base}/ws`;
   }
 
-  if (typeof window !== 'undefined' && window.location) {
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//${window.location.host}/ws`;
+  // WebSocketはVercelのrewriteでプロキシできないため、
+  // 環境変数が未設定でも同一オリジンにはせず、常にバックエンドへ直接接続する
+  if (import.meta.env.PROD) {
+    return 'wss://numduel-backend.onrender.com/ws';
   }
 
   return 'ws://localhost:8090/ws';

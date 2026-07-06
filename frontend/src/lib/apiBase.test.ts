@@ -27,9 +27,17 @@ describe('resolveWsBaseURL', () => {
     vi.unstubAllEnvs();
   });
 
-  it('derives ws url from window location', () => {
+  it('falls back to localhost in dev when VITE_WS_BASE_URL is unset', () => {
     vi.unstubAllEnvs();
-    const url = resolveWsBaseURL();
-    expect(url.endsWith('/ws')).toBe(true);
+    vi.stubEnv('PROD', false);
+    expect(resolveWsBaseURL()).toBe('ws://localhost:8090/ws');
+    vi.unstubAllEnvs();
+  });
+
+  it('falls back to the backend origin directly in production (Vercel cannot proxy WebSocket upgrades)', () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv('PROD', true);
+    expect(resolveWsBaseURL()).toBe('wss://numduel-backend.onrender.com/ws');
+    vi.unstubAllEnvs();
   });
 });
