@@ -94,25 +94,35 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     [disconnect],
   );
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(() => {
     if (!shouldConnectRef.current || wsRef.current) {
       return;
     }
     setConnecting(true);
 
-    const ticket = await fetchWsTicket();
-
-    if (!shouldConnectRef.current) {
-      setConnecting(false);
-      return;
-    }
-
     const ws = new WebSocket(WS_BASE_URL);
     wsRef.current = ws;
 
+    let ticket = '';
+    let ticketReady = false;
+    let opened = false;
+
+    const sendAuthIfReady = () => {
+      if (opened && ticketReady && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'AUTH', ticket }));
+      }
+    };
+
+    fetchWsTicket().then((t) => {
+      ticket = t;
+      ticketReady = true;
+      sendAuthIfReady();
+    });
+
     ws.onopen = () => {
+      opened = true;
       reconnectAttemptRef.current = 0;
-      ws.send(JSON.stringify({ type: 'AUTH', ticket }));
+      sendAuthIfReady();
       clearPing();
       pingRef.current = window.setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -164,14 +174,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const reconnect = useCallback(() => {
     wsRef.current?.close();
     wsRef.current = null;
-    void connect();
+    connect();
   }, [connect]);
 
   useEffect(() => {
     const enabled = isAuthenticated && user?.role === 'user';
     if (enabled) {
       shouldConnectRef.current = true;
-      void connect();
+      connect();
     } else {
       disconnect();
     }
