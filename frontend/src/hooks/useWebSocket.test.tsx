@@ -24,14 +24,17 @@ function mockWsTicketFetch() {
 }
 
 describe('useWebSocket', () => {
-  beforeEach(() => {
-    MockWebSocket.reset();
-    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
-    mockWsTicketFetch();
-    useAuth.mockReturnValue({
-      isAuthenticated: true,
-      user: { id: '1', username: 'alice', role: 'user' },
-    });
+ beforeEach(() => {
+  MockWebSocket.reset();
+  vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ data: { ticket: 'test-ticket' } }),
+  }));
+  useAuth.mockReturnValue({
+    isAuthenticated: true,
+    user: { id: '1', username: 'alice', role: 'user' },
+  });
   });
 
   afterEach(() => {
