@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockWebSocket } from '../test/mockWebSocket';
 import { WebSocketProvider, useWebSocket } from './useWebSocket';
@@ -13,28 +13,21 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <WebSocketProvider>{children}</WebSocketProvider>;
 }
 
-function mockWsTicketFetch() {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: { ticket: 'test-ticket' } }),
-    }),
-  );
-}
-
 describe('useWebSocket', () => {
- beforeEach(() => {
-  MockWebSocket.reset();
-  vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ data: { ticket: 'test-ticket' } }),
-  }));
-  useAuth.mockReturnValue({
-    isAuthenticated: true,
-    user: { id: '1', username: 'alice', role: 'user' },
-  });
+  beforeEach(() => {
+    MockWebSocket.reset();
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: { ticket: 'test-ticket' } }),
+      }),
+    );
+    useAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: '1', username: 'alice', role: 'user' },
+    });
   });
 
   afterEach(() => {
@@ -46,13 +39,13 @@ describe('useWebSocket', () => {
     const listener = vi.fn();
     const { result } = renderHook(() => useWebSocket(), { wrapper });
 
-    await waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+    await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
     const ws = MockWebSocket.latest();
-    act(() => {
+    await act(async () => {
       ws.simulateOpen();
       ws.simulateMessage({ type: 'AUTH_OK' });
     });
-    await waitFor(() => expect(result.current.connected).toBe(true));
+    await vi.waitFor(() => expect(result.current.connected).toBe(true));
 
     result.current.subscribe(listener);
     act(() => {
@@ -68,19 +61,19 @@ describe('useWebSocket', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderHook(() => useWebSocket(), { wrapper });
-    await waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+    await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
     const ws = MockWebSocket.latest();
 
-    act(() => {
+    await act(async () => {
       ws.simulateOpen();
       ws.simulateMessage({ type: 'ERROR', data: { code: 'token_expired' } });
     });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
-    act(() => {
+    await act(async () => {
       ws.simulateMessage({ type: 'ERROR', data: { code: 'unauthorized' } });
     });
-    await waitFor(() => expect(result.current.connected).toBe(false));
+    await vi.waitFor(() => expect(result.current.connected).toBe(false));
   });
 
   it('emits RECONNECT_FAILED after max reconnect attempts', async () => {
@@ -89,18 +82,24 @@ describe('useWebSocket', () => {
     const { result } = renderHook(() => useWebSocket(), { wrapper });
     result.current.subscribe(listener);
 
-    await waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+    // vi.waitFor はフェイクタイマーと連携して動くため、waitFor(testing-library版) の代わりに使う
+    await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
 
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const ws = MockWebSocket.latest();
-      act(() => {
+
+      await act(async () => {
         ws.close();
+        // close 内のイベント発火やマイクロタスクを確実にフラッシュする
+        await vi.advanceTimersByTimeAsync(0);
       });
+
       if (attempt < 5) {
-        act(() => {
-          vi.advanceTimersByTime(1000 * 2 ** attempt);
+        await act(async () => {
+          // タイマーとマイクロタスク(fetchWsTicket 等)を同時に進める
+          await vi.advanceTimersByTimeAsync(1000 * 2 ** attempt);
         });
-        await waitFor(() => expect(MockWebSocket.instances.length).toBeGreaterThan(attempt));
+        expect(MockWebSocket.instances.length).toBeGreaterThan(attempt);
       }
     }
 
@@ -113,7 +112,7 @@ describe('useWebSocket', () => {
       user: { id: '1', username: 'admin', role: 'master' },
     });
     renderHook(() => useWebSocket(), { wrapper });
-    await waitFor(() => expect(MockWebSocket.instances.length).toBe(0));
+    await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(0));
   });
 
   it('throws outside provider', () => {
