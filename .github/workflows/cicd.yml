@@ -308,19 +308,26 @@ jobs:
             exit 1
           fi
 
+          echo "DEBUG: cookies.txt contents (raw, tab-visible):"
+          cat -A cookies.txt || true
+
           WS_URL="${ORIGIN/http/ws}/ws"
           echo "DEBUG: WS_URL=$WS_URL"
           WS_URL="$WS_URL" COOKIE_FILE="cookies.txt" node <<'NODE'
           const fs = require('fs');
           const WebSocket = require('ws');
           const wsUrl = process.env.WS_URL;
-          const cookieLines = fs.readFileSync(process.env.COOKIE_FILE, 'utf8')
+          const raw = fs.readFileSync(process.env.COOKIE_FILE, 'utf8');
+          console.log('DEBUG(node): raw cookie file =\n' + raw);
+          const cookieLines = raw
             .split('\n')
             .filter((l) => l && !l.startsWith('#'));
+          console.log('DEBUG(node): filtered cookie lines =', JSON.stringify(cookieLines));
           const cookie = cookieLines.map((l) => {
             const cols = l.split('\t');
             return `${cols[5]}=${cols[6]}`;
           }).join('; ');
+          console.log('DEBUG(node): built Cookie header =', cookie);
           const ws = new WebSocket(wsUrl, { headers: { Cookie: cookie } });
           const timer = setTimeout(() => { console.log('DEBUG: ws timeout'); process.exit(1); }, 10000);
           ws.on('open', () => {
